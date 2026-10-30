@@ -263,6 +263,30 @@ export async function upsertProducts(productsArray) {
   return data;
 }
 
+/**
+ * Xóa một sản phẩm khỏi danh mục
+ */
+export async function deleteProduct(id) {
+  if (isDemoMode()) {
+    await ensureDemoInitialized();
+    const products = getStore(KEYS.PRODUCTS, []);
+    const filtered = products.filter((p) => String(p.id) !== String(id));
+    setStore(KEYS.PRODUCTS, filtered);
+    return true;
+  }
+
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', String(id));
+
+  if (error) {
+    console.error('deleteProduct error:', error);
+    throw error;
+  }
+  return true;
+}
+
 // ==============================================================================
 // TEAMS & EMPLOYEES APIS
 // ==============================================================================
@@ -662,6 +686,7 @@ export default {
   updateProductToggle,
   bulkUpdateProductToggle,
   upsertProducts,
+  deleteProduct,
   getTeams,
   getEmployees,
   upsertEmployees,
