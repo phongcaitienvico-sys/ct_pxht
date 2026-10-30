@@ -1,4 +1,6 @@
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   calculateProductStats,
   extractCustomerOptions,
@@ -307,7 +309,26 @@ async function runProductManagerTests() {
     console.log('✔ validateProductInput passed');
   }
 
+  // Catalog UI: columns "Mã ID" and "Trạng Thái" removed, id still searchable & auto-generated
+  {
+    const pmSource = fs.readFileSync(path.join(process.cwd(), 'src/components/admin/ProductManager.jsx'), 'utf8');
+    assert.ok(!pmSource.includes('>Mã ID<'), 'Mã ID column header must be removed');
+    assert.ok(!/<th[^>]*>Trạng Thái<\/th>/.test(pmSource), 'Trạng Thái column header must be removed');
+    assert.ok(!pmSource.includes('Mã ID Sản Phẩm'), 'Mã ID form field must be removed');
+    assert.ok(!pmSource.includes('Trạng Thái Sản Xuất'), 'Status form field must be removed');
+    for (const col of ['Bật/Tắt Hôm Nay', 'Tên Sản Phẩm', 'Khách Hàng', 'SL Đơn', 'SL Phôi', 'Hành Động']) {
+      assert.ok(pmSource.includes(col), `Column "${col}" must remain`);
+    }
+    const autoId = validateProductInput({ name: 'SP mới', customer: 'KH' });
+    assert.strictEqual(autoId.valid, true);
+    assert.ok(autoId.sanitized.id.startsWith('SP_'), 'id auto-generated when not provided');
+    assert.strictEqual(autoId.sanitized.status, 'Sx', 'status defaults to Sx');
+    assert.strictEqual(filterProducts(sampleProducts, { searchTerm: sampleProducts[0].id }).length >= 1, true, 'search still matches id');
+    console.log('✔ ProductManager id/status columns removed, search by id kept');
+  }
+
   console.log('\n=========================================');
+
   console.log('🎉 ALL PRODUCT MANAGER TESTS PASSED SUCCESSFULLY!');
   console.log('=========================================');
 }

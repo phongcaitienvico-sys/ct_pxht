@@ -171,3 +171,167 @@ ON CONFLICT (id) DO UPDATE SET
   status = EXCLUDED.status,
   is_active_today = EXCLUDED.is_active_today,
   updated_at = NOW();
+
+-- ==============================================================================
+-- QUAN LY TAI KHOAN (ACCOUNT MANAGEMENT) - dang nhap bang ten dang nhap + mat khau
+-- Bang app_accounts bat RLS va KHONG co policy nao -> anon key khong doc/ghi truc tiep duoc.
+-- Moi thao tac di qua ham SECURITY DEFINER ben duoi. Mat khau duoc bam bang bcrypt
+-- (pgcrypto crypt/gen_salt) NGAY TREN MAY CHU; trinh duyet chi gui mat khau qua HTTPS toi RPC.
+-- Luu y: cac bang du lieu khac (products, production_logs...) van dung anon key (xem README).
+-- ==============================================================================
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+CREATE TABLE IF NOT EXISTS app_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username TEXT NOT NULL,
+  salt TEXT NOT NULL DEFAULT '', -- bcrypt da nhung salt vao password_hash; cot giu lai cho dong bo voi che do demo
+  password_hash TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'leader')),
+  team_id UUID REFERENCES teams(id) ON DELETE RESTRICT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT leader_needs_team CHECK (role <> 'leader' OR team_id IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_app_accounts_username ON app_accounts (lower(username));
+
+ALTER TABLE app_accounts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON app_accounts FROM anon, authenticated;
+
+-- Kiem tra quan tri vien (ten + mat khau); tra ve id hoac bao loi. Khong cho goi tu client.
+CREATE OR REPLACE FUNCTION app_assert_admin(p_admin_username TEXT, p_admin_password TEXT)
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE v_id UUID;
+BEGIN
+  SELECT id INTO v_id FROM app_accounts
+   WHERE lower(username) = lower(COALESCE(p_admin_username, ''))
+     AND role = 'admin' AND is_active
+     AND password_hash = crypt(COALESCE(p_admin_password, ''), password_hash);
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'Chỉ tài khoản quản trị (nhập đúng mật khẩu) mới có quyền thực hiện';
+  END IF;
+  RETURN v_id;
+END $$;
+REVOKE ALL ON FUNCTION app_assert_admin(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+
+-- Dang nhap: tra ve jsonb thong tin an toan hoac NULL neu sai / bi khoa
+CREATE OR REPLACE FUNCTION app_login(p_username TEXT, p_password TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE r JSONB;
+BEGIN
+  SELECT jsonb_build_object('id', id, 'username', username, 'full_name', full_name,
+                            'role', role, 'team_id', team_id, 'is_active', is_active)
+    INTO r FROM app_accounts
+   WHERE lower(username) = lower(COALESCE(p_username, '')) AND is_active
+     AND password_hash = crypt(COALESCE(p_password, ''), password_hash);
+  RETURN r;
+END $$;
+
+CREATE OR REPLACE FUNCTION app_list_accounts(p_admin_username TEXT, p_admin_password TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+BEGIN
+  PERFORM app_assert_admin(p_admin_username, p_admin_password);
+  RETURN COALESCE((
+    SELECT jsonb_agg(jsonb_build_object('id', id, 'username', username, 'full_name', full_name,
+                                        'role', role, 'team_id', team_id, 'is_active', is_active)
+                     ORDER BY username)
+      FROM app_accounts), '[]'::jsonb);
+END $$;
+
+CREATE OR REPLACE FUNCTION app_create_account(
+  p_admin_username TEXT, p_admin_password TEXT,
+  p_username TEXT, p_password TEXT, p_full_name TEXT, p_role TEXT, p_team_id UUID DEFAULT NULL)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE r JSONB;
+BEGIN
+  PERFORM app_assert_admin(p_admin_username, p_admin_password);
+  IF length(COALESCE(p_password, '')) < 6 THEN
+    RAISE EXCEPTION 'Mật khẩu phải có ít nhất 6 ký tự';
+  END IF;
+  IF p_role = 'leader' AND p_team_id IS NULL THEN
+    RAISE EXCEPTION 'Tổ trưởng bắt buộc phải thuộc một tổ';
+  END IF;
+  IF EXISTS (SELECT 1 FROM app_accounts WHERE lower(username) = lower(p_username)) THEN
+    RAISE EXCEPTION 'Tên đăng nhập đã tồn tại';
+  END IF;
+  INSERT INTO app_accounts (username, password_hash, full_name, role, team_id)
+  VALUES (lower(trim(p_username)), crypt(p_password, gen_salt('bf')), trim(p_full_name), p_role,
+          CASE WHEN p_role = 'leader' THEN p_team_id ELSE NULL END)
+  RETURNING jsonb_build_object('id', id, 'username', username, 'full_name', full_name,
+                               'role', role, 'team_id', team_id, 'is_active', is_active) INTO r;
+  RETURN r;
+END $$;
+
+-- Cap nhat: ho ten, to, khoa/mo khoa, dat lai mat khau (tham so NULL = giu nguyen)
+CREATE OR REPLACE FUNCTION app_update_account(
+  p_admin_username TEXT, p_admin_password TEXT, p_id UUID,
+  p_full_name TEXT DEFAULT NULL, p_team_id UUID DEFAULT NULL,
+  p_is_active BOOLEAN DEFAULT NULL, p_password TEXT DEFAULT NULL)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE v_admin UUID; v_target app_accounts; r JSONB;
+BEGIN
+  v_admin := app_assert_admin(p_admin_username, p_admin_password);
+  SELECT * INTO v_target FROM app_accounts WHERE id = p_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Không tìm thấy tài khoản'; END IF;
+  IF p_password IS NOT NULL AND length(p_password) < 6 THEN
+    RAISE EXCEPTION 'Mật khẩu phải có ít nhất 6 ký tự';
+  END IF;
+  IF p_is_active = FALSE AND v_target.is_active THEN
+    IF v_target.id = v_admin THEN RAISE EXCEPTION 'Không thể khóa chính mình'; END IF;
+    IF v_target.role = 'admin'
+       AND (SELECT count(*) FROM app_accounts WHERE role = 'admin' AND is_active) <= 1 THEN
+      RAISE EXCEPTION 'Không thể khóa tài khoản quản trị cuối cùng';
+    END IF;
+  END IF;
+  UPDATE app_accounts SET
+    full_name = COALESCE(NULLIF(trim(p_full_name), ''), full_name),
+    team_id = CASE WHEN role = 'leader' THEN COALESCE(p_team_id, team_id) ELSE NULL END,
+    is_active = COALESCE(p_is_active, is_active),
+    password_hash = CASE WHEN p_password IS NOT NULL THEN crypt(p_password, gen_salt('bf')) ELSE password_hash END
+  WHERE id = p_id
+  RETURNING jsonb_build_object('id', id, 'username', username, 'full_name', full_name,
+                               'role', role, 'team_id', team_id, 'is_active', is_active) INTO r;
+  RETURN r;
+END $$;
+
+CREATE OR REPLACE FUNCTION app_delete_account(p_admin_username TEXT, p_admin_password TEXT, p_id UUID)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE v_admin UUID; v_target app_accounts;
+BEGIN
+  v_admin := app_assert_admin(p_admin_username, p_admin_password);
+  SELECT * INTO v_target FROM app_accounts WHERE id = p_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Không tìm thấy tài khoản'; END IF;
+  IF v_target.id = v_admin THEN RAISE EXCEPTION 'Không thể xóa chính mình'; END IF;
+  IF v_target.role = 'admin' AND v_target.is_active
+     AND (SELECT count(*) FROM app_accounts WHERE role = 'admin' AND is_active) <= 1 THEN
+    RAISE EXCEPTION 'Không thể xóa tài khoản quản trị cuối cùng';
+  END IF;
+  DELETE FROM app_accounts WHERE id = p_id;
+END $$;
+
+-- Nguoi dung tu doi mat khau cua minh
+CREATE OR REPLACE FUNCTION app_change_password(p_username TEXT, p_old_password TEXT, p_new_password TEXT)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE v_id UUID;
+BEGIN
+  IF length(COALESCE(p_new_password, '')) < 6 THEN
+    RAISE EXCEPTION 'Mật khẩu phải có ít nhất 6 ký tự';
+  END IF;
+  SELECT id INTO v_id FROM app_accounts
+   WHERE lower(username) = lower(COALESCE(p_username, '')) AND is_active
+     AND password_hash = crypt(COALESCE(p_old_password, ''), password_hash);
+  IF v_id IS NULL THEN RAISE EXCEPTION 'Mật khẩu hiện tại không đúng'; END IF;
+  UPDATE app_accounts SET password_hash = crypt(p_new_password, gen_salt('bf')) WHERE id = v_id;
+END $$;
+
+GRANT EXECUTE ON FUNCTION app_login(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_list_accounts(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_create_account(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_update_account(TEXT, TEXT, UUID, TEXT, UUID, BOOLEAN, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_delete_account(TEXT, TEXT, UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_change_password(TEXT, TEXT, TEXT) TO anon, authenticated;
+
+-- Tai khoan quan tri mac dinh (admin / admin123) - CHI tao khi chua co tai khoan nao. Hay doi mat khau ngay!
+INSERT INTO app_accounts (username, password_hash, full_name, role)
+SELECT 'admin', crypt('admin123', gen_salt('bf')), 'Quản Trị Viên', 'admin'
+WHERE NOT EXISTS (SELECT 1 FROM app_accounts);

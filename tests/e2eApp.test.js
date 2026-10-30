@@ -15,7 +15,8 @@ import {
 } from '../src/lib/supabase.js';
 
 import { filterActiveProducts, filterTeamEmployees } from '../src/components/leader/leaderEntryLogic.js';
-import { switchDemoRoleLogic, DEMO_TEAM_MAP } from '../src/contexts/authLogic.js';
+import { loginLogic, clearAuthSession, DEMO_TEAM_MAP } from '../src/contexts/authLogic.js';
+import { createAccount, resetAccounts } from '../src/lib/supabase.js';
 import { calculateTodayKPI } from '../src/components/admin/realtimeFeedLogic.js';
 import {
   filterLogsByCriteria,
@@ -171,18 +172,33 @@ async function runE2ETests() {
   assert.ok(summaryJson.length >= 1, 'Summary sheet should have employee summary rows');
   console.log('  ✔ Step 6: Excel dual-sheet report generation verified successfully');
 
-  // Step 7: Chuyển đổi sang Tổ Trưởng 1 & Kiểm tra danh sách thợ trong tổ mà không cần bật "Xem thợ tổ khác"
-  const leader1Session = switchDemoRoleLogic('leader1');
-  assert.strictEqual(leader1Session.role, 'leader', 'Switching to leader1 must set role to leader');
-  assert.strictEqual(leader1Session.user.teamId, 'team-1', 'Leader1 profile has teamId team-1');
+  // Step 7: Tổ trưởng đăng nhập bằng tài khoản (tên đăng nhập + mật khẩu) & kiểm tra danh sách thợ trong tổ
+  resetAccounts();
+  await createAccount({
+    username: 'totruong1',
+    password: 'matkhau1',
+    full_name: 'Tổ Trưởng 1',
+    role: 'leader',
+    team_id: 'a0000000-0000-0000-0000-000000000001'
+  });
+  const leader1Session = await loginLogic('totruong1', 'matkhau1');
+  assert.strictEqual(leader1Session.success, true, 'Leader account must log in');
+  assert.strictEqual(leader1Session.role, 'leader', 'Leader account must resolve role leader');
+  assert.strictEqual(
+    leader1Session.user.teamId,
+    'a0000000-0000-0000-0000-000000000001',
+    'Leader carries team_id from account'
+  );
+  clearAuthSession();
 
-  // Kiểm tra DEMO_TEAM_MAP ánh xạ chính xác 'team-1' sang UUID hạt giống
+  // DEMO_TEAM_MAP vẫn ánh xạ id cũ sang UUID hạt giống, UUID thật được giữ nguyên
   const effectiveTeamId = DEMO_TEAM_MAP[leader1Session.user.teamId] || leader1Session.user.teamId;
   assert.strictEqual(
     effectiveTeamId,
     'a0000000-0000-0000-0000-000000000001',
     'Effective teamId passed to LeaderEntryForm must match seed UUID a0000000-0000-0000-0000-000000000001'
   );
+  assert.strictEqual(DEMO_TEAM_MAP['team-1'], 'a0000000-0000-0000-0000-000000000001');
 
   // Lấy toàn bộ nhân viên và lọc theo effectiveTeamId với includeOtherTeams = false
   const allEmployeesList = await getEmployees();
@@ -206,7 +222,7 @@ async function runE2ETests() {
     workerNames.includes('Nguyễn Đình Tú'),
     'Danh sách thợ của Tổ 1 phải có Nguyễn Đình Tú'
   );
-  console.log('  ✔ Step 7: Demo role Tổ Trưởng 1 shows preloaded workers (Trần Văn Hùng, Lê Văn Cường, Nguyễn Đình Tú) in their team without needing to check "Xem thợ tổ khác"');
+  console.log('  ✔ Step 7: Tổ trưởng account shows preloaded workers (Trần Văn Hùng, Lê Văn Cường, Nguyễn Đình Tú) in their team without needing to check "Xem thợ tổ khác"');
 
   // =========================================================================
   // SECTION 2: APPLICATION SHELL & COMPONENT VERIFICATION
@@ -224,19 +240,18 @@ async function runE2ETests() {
     'Navbar must show PXHT brand'
   );
   assert.ok(
-    navbarContent.includes('switchDemoRole') || navbarContent.includes('DEMO_PROFILES'),
-    'Navbar must support fast demo role switching'
-  );
-  assert.ok(
-    navbarContent.includes('isDemoMode'),
-    'Navbar must display data mode indicator (Demo vs Supabase Live)'
+    !navbarContent.includes('switchDemoRole') &&
+      !navbarContent.includes('Chuyển Vai Trò') &&
+      !navbarContent.includes('Demo Mode'),
+    'Navbar must not contain demo role switcher or Demo Mode badge'
   );
   assert.ok(
     navbarContent.includes('products') &&
     navbarContent.includes('realtime') &&
     navbarContent.includes('reports') &&
-    navbarContent.includes('employees'),
-    'Navbar must declare admin navigation tabs (products, realtime, reports, employees)'
+    navbarContent.includes('employees') &&
+    navbarContent.includes('accounts'),
+    'Navbar must declare admin navigation tabs (products, realtime, reports, employees, accounts)'
   );
   assert.ok(
     navbarContent.includes('entry') && navbarContent.includes('logs'),
@@ -254,7 +269,8 @@ async function runE2ETests() {
   assert.ok(appContent.includes('EmployeeManager'), 'App.jsx must import EmployeeManager');
   assert.ok(appContent.includes('LeaderEntryForm'), 'App.jsx must import LeaderEntryForm');
   assert.ok(appContent.includes('LeaderDailyLogs'), 'App.jsx must import LeaderDailyLogs');
-  assert.ok(appContent.includes('LoginModal'), 'App.jsx must support LoginModal');
+  assert.ok(appContent.includes('LoginModal'), 'App.jsx must render the login screen');
+  assert.ok(appContent.includes('AccountManager'), 'App.jsx must import AccountManager');
   assert.ok(appContent.includes('DEMO_TEAM_MAP'), 'App.jsx must declare DEMO_TEAM_MAP');
   assert.ok(
     appContent.includes('teamId={effectiveTeamId}'),
@@ -300,7 +316,7 @@ async function runE2ETests() {
   // 4. Verify README.md documentation
   const readmeContent = assertFileExists('README.md', 'Project Documentation README');
   assert.ok(
-    readmeContent.includes('Phân Xưởng Hàn Tàu') || readmeContent.includes('PXHT'),
+    readmeContent.includes('Phân Xưởng Hoàn Thiện') && readmeContent.includes('PXHT'),
     'README.md must describe PXHT production logging application'
   );
   assert.ok(

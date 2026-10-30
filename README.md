@@ -1,6 +1,6 @@
-# PXHT - Hệ Thống Nhật Ký Sản Xuất Phân Xưởng Hàn Tàu 🚢⚙️
+# PXHT - Hệ Thống Nhật Ký Sản Xuất Phân Xưởng Hoàn Thiện 🚢⚙️
 
-Hệ thống ghi nhận, theo dõi sản lượng và quản lý phân công sản xuất hàng ngày theo thời gian thực (Real-time Production Logging System) được thiết kế chuyên biệt cho **Phân Xưởng Hàn Tàu (PXHT)**.
+Hệ thống ghi nhận, theo dõi sản lượng và quản lý phân công sản xuất hàng ngày theo thời gian thực (Real-time Production Logging System) được thiết kế chuyên biệt cho **Phân Xưởng Hoàn Thiện (PXHT)**.
 
 Ứng dụng đáp ứng mô hình 2 vai trò linh hoạt:
 - 🖥️ **Quản Đốc (Admin PC)**: Quản lý danh mục sản phẩm gia công, danh sách công nhân viên, giám sát luồng sản lượng theo thời gian thực và phân tích báo cáo, xuất file Excel chuẩn biểu mẫu 2 sheet.
@@ -25,6 +25,7 @@ Hệ thống ghi nhận, theo dõi sản lượng và quản lý phân công s�
   - Phân tích hiệu suất trung bình (sản phẩm/giờ), tổng ngày công và tổng thời gian gia công.
   - Bảng tổng hợp theo từng người thợ và danh sách chi tiết từng lượt gia công.
   - **Xuất Báo Cáo Excel Đạt Chuẩn**: Tạo file `.xlsx` tự động gồm 2 Sheet chuyên nghiệp (`Chi_Tiet_San_Luong` và `Tong_Hop_Theo_Nhan_Vien`).
+- **🔑 Quản Lý Tài Khoản (`AccountManager`)**: tạo/sửa/khóa/xóa tài khoản quản trị & tổ trưởng, đặt lại mật khẩu, quản lý tổ.
 - **👥 Quản Lý Nhân Viên (`EmployeeManager`)**:
   - Quản lý danh sách thợ theo tổ (Tổ 1 - Cơ khí & Đúc, Tổ 2 - Tiện & Phay,...).
   - Thêm, sửa thông tin thợ, kích hoạt / tạm dừng trạng thái làm việc.
@@ -44,13 +45,22 @@ Hệ thống ghi nhận, theo dõi sản lượng và quản lý phân công s�
   - Chỉnh sửa nhanh số lượng, giờ làm, ghi chú hoặc xóa dòng nhập nhầm có hộp thoại xác nhận an toàn.
   - Nút chuyển nhanh sang màn hình nhập sản lượng mới.
 
-### 3. Trải Nghiệm Demo 1-Chạm & Offline Fallback
-- Khi chưa cấu hình Supabase Cloud, hệ thống tự động chạy ở chế độ **Demo Mode** sử dụng In-Memory / Local Storage với dữ liệu mẫu thực tế của xưởng tàu.
-- Thanh Navbar tích hợp bộ chuyển nhanh tài khoản Demo:
-  - 🖥️ **Quản Đốc (PC)**: `quandoc@pxht.vn`
-  - 📱 **Tổ Trưởng 1 (Cơ khí & Đúc)**: `totruong1@pxht.vn`
-  - 📱 **Tổ Trưởng 2 (Gia công & Lắp ráp)**: `totruong2@pxht.vn`
-- Trên máy tính, màn hình Tổ trưởng hỗ trợ nút chuyển đổi: **Mô phỏng khung điện thoại** 📱 hoặc **Mở rộng toàn màn hình** 🖥️.
+### 3. Chế Độ Thử Nghiệm (Offline Fallback)
+- Khi chưa cấu hình Supabase Cloud, hệ thống tự chạy ở **chế độ thử nghiệm** lưu dữ liệu cục bộ (Local Storage) với dữ liệu mẫu của xưởng. Chế độ này cũng yêu cầu đăng nhập như bình thường (xem mục **Quản lý tài khoản** bên dưới).
+- Trên máy tính, màn hình Tổ trưởng có mục **Mô phỏng màn hình điện thoại** trong menu người dùng (góc phải thanh điều hướng).
+
+## 🔑 Quản lý tài khoản
+
+Hệ thống đăng nhập bằng **tên đăng nhập + mật khẩu** (không dùng email). Không còn chế độ tự đăng nhập hay chuyển vai trò demo.
+
+- **Tài khoản quản trị mặc định**: tên đăng nhập `admin`, mật khẩu `admin123` (tự tạo ở lần chạy đầu tiên khi chưa có tài khoản nào; trong Supabase thì được seed bởi `docs/supabase_schema.sql`). Khi còn dùng mật khẩu mặc định, giao diện quản trị hiển thị cảnh báo *"Bạn đang dùng mật khẩu mặc định — hãy đổi ngay"*. Hãy đổi ngay qua menu người dùng → **Đổi mật khẩu**.
+- **Thêm tổ trưởng**: đăng nhập quản trị → tab **Tài Khoản**:
+  1. Mục **Quản lý tổ**: thêm tổ thật của xưởng hoặc đổi tên tổ có sẵn.
+  2. Bấm **Thêm tài khoản**, nhập tên đăng nhập, họ tên, chọn vai trò **Tổ trưởng**, chọn **Tổ**, đặt mật khẩu (tối thiểu 6 ký tự).
+  3. Có thể sửa họ tên/tổ, **đặt lại mật khẩu**, khóa/mở khóa hoặc xóa tài khoản. Không thể xóa/khóa chính mình hoặc quản trị viên cuối cùng.
+- **Mọi người dùng** (kể cả tổ trưởng) tự đổi mật khẩu từ menu người dùng → **Đổi mật khẩu**.
+- **Lưu mật khẩu**: không bao giờ lưu mật khẩu thô. Chế độ thử nghiệm băm SHA-256 + salt ngẫu nhiên từng tài khoản (Web Crypto). Chế độ Supabase gửi mật khẩu qua HTTPS tới các hàm RPC `security definer` (`app_login`, `app_create_account`...) và băm bcrypt (`pgcrypto`) ngay trên máy chủ; bảng `app_accounts` bật RLS và không có policy truy cập trực tiếp. Khi quản lý tài khoản ở chế độ Supabase, hệ thống yêu cầu nhập lại mật khẩu quản trị (chỉ giữ trong bộ nhớ trang).
+- **Hạn chế đã biết (cần siết chặt sau)**: các bảng dữ liệu khác (`products`, `employees`, `production_logs`, `teams`) vẫn truy cập bằng khóa `anon` của Supabase với policy rộng, nên đăng nhập hiện chủ yếu kiểm soát *giao diện*, chưa phải ranh giới bảo mật dữ liệu ở tầng cơ sở dữ liệu. Chưa có giới hạn số lần đăng nhập sai. Khi triển khai thật nên chuyển sang Supabase Auth / JWT và siết RLS cho các bảng còn lại. Nếu đã chạy schema cũ, hãy chạy lại `docs/supabase_schema.sql` để tạo bảng `app_accounts` và các hàm RPC.
 
 ---
 
@@ -211,5 +221,5 @@ Dự án đã được cấu hình tự động hóa toàn diện thông qua Git
 
 ## 🔒 Giấy Phép & Bản Quyền
 
-Dự án được xây dựng và phát triển phục vụ công tác điều hành sản xuất tại **Phân Xưởng Hàn Tàu (PXHT)**.
+Dự án được xây dựng và phát triển phục vụ công tác điều hành sản xuất tại **Phân Xưởng Hoàn Thiện (PXHT)**.
 Bản quyền © 2026 PXHT. Mọi quyền được bảo lưu.

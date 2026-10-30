@@ -1,5 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { seedProducts, seedTeams, seedEmployees, seedLogs } from '../data/seedData.js';
+import { hashPassword, verifyPassword } from './passwordHash.js';
+import {
+  DEFAULT_ADMIN,
+  normalizeUsername,
+  validateNewAccount,
+  validateAccountUpdate,
+  validatePassword,
+  canDeleteAccount,
+  canToggleActive
+} from '../components/admin/accountManagerLogic.js';
 
 // Safe environment variable resolution (supports Vite import.meta.env and Node process.env)
 const env =
@@ -26,7 +36,8 @@ const KEYS = {
   PRODUCTS: 'pxht_products',
   TEAMS: 'pxht_teams',
   EMPLOYEES: 'pxht_employees',
-  LOGS: 'pxht_production_logs'
+  LOGS: 'pxht_production_logs',
+  ACCOUNTS: 'pxht_accounts'
 };
 
 const memoryStore = {};
@@ -672,6 +683,317 @@ export function subscribeToLogs(callback) {
   };
 }
 
+// ==============================================================================
+// TEAM MANAGEMENT APIS
+// ==============================================================================
+
+function normalizeTeamName(name) {
+  return String(name ?? '').trim();
+}
+
+/**
+ * Tạo tổ sản xuất mới
+ */
+export async function createTeam(name) {
+  const clean = normalizeTeamName(name);
+  if (!clean) throw new Error('Vui lòng nhập tên tổ');
+
+  if (isDemoMode()) {
+    await ensureDemoInitialized();
+    const teams = getStore(KEYS.TEAMS, []);
+    if (teams.some((t) => t.name.toLowerCase() === clean.toLowerCase())) {
+      throw new Error('Tên tổ đã tồn tại');
+    }
+    const team = { id: generateId(), name: clean, leader_email: null };
+    setStore(KEYS.TEAMS, [...teams, team]);
+    return { ...team };
+  }
+
+  const { data, error } = await supabase.from('teams').insert({ name: clean }).select().single();
+  if (error) {
+    if (error.code === '23505') throw new Error('Tên tổ đã tồn tại');
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Đổi tên tổ sản xuất
+ */
+export async function updateTeam(id, updates = {}) {
+  const clean = normalizeTeamName(updates.name);
+  if (!clean) throw new Error('Vui lòng nhập tên tổ');
+
+  if (isDemoMode()) {
+    await ensureDemoInitialized();
+    const teams = getStore(KEYS.TEAMS, []);
+    const team = teams.find((t) => t.id === id);
+    if (!team) throw new Error('Không tìm thấy tổ');
+    if (teams.some((t) => t.id !== id && t.name.toLowerCase() === clean.toLowerCase())) {
+      throw new Error('Tên tổ đã tồn tại');
+    }
+    team.name = clean;
+    setStore(KEYS.TEAMS, teams);
+    return { ...team };
+  }
+
+  const { data, error } = await supabase.from('teams').update({ name: clean }).eq('id', id).select().single();
+  if (error) {
+    if (error.code === '23505') throw new Error('Tên tổ đã tồn tại');
+    throw error;
+  }
+  return data;
+}
+
+// ==============================================================================
+// ACCOUNT APIS
+// Demo: lưu cục bộ (mật khẩu băm SHA-256 + salt). Supabase: gọi RPC security definer,
+// việc băm (pgcrypto/bcrypt) diễn ra phía máy chủ.
+// ==============================================================================
+
+function safeAccount(a) {
+  if (!a) return null;
+  const { salt, password_hash, password, ...safe } = a;
+  return { ...safe };
+}
+
+let seedingAccounts = null;
+
+async function ensureAccountsSeeded() {
+  const existing = getStore(KEYS.ACCOUNTS, null);
+  if (Array.isArray(existing) && existing.length > 0) return;
+  if (!seedingAccounts) {
+    seedingAccounts = (async () => {
+      const { salt, hash } = await hashPassword(DEFAULT_ADMIN.password);
+      setStore(KEYS.ACCOUNTS, [
+        {
+          id: generateId(),
+          username: DEFAULT_ADMIN.username,
+          salt,
+          password_hash: hash,
+          full_name: DEFAULT_ADMIN.full_name,
+          role: 'admin',
+          team_id: null,
+          is_active: true,
+          created_at: new Date().toISOString()
+        }
+      ]);
+    })().finally(() => {
+      seedingAccounts = null;
+    });
+  }
+  await seedingAccounts;
+}
+
+/**
+ * Xoá toàn bộ tài khoản demo (sẽ tự tạo lại admin mặc định ở lần dùng kế tiếp)
+ */
+export function resetAccounts() {
+  setStore(KEYS.ACCOUNTS, []);
+}
+
+function adminRpcArgs(admin) {
+  return {
+    p_admin_username: admin?.username || '',
+    p_admin_password: admin?.password || ''
+  };
+}
+
+async function callRpc(name, args) {
+  const { data, error } = await supabase.rpc(name, args);
+  if (error) {
+    throw new Error(error.message || 'Lỗi máy chủ');
+  }
+  return data;
+}
+
+async function assertDemoAdmin(accounts, admin) {
+  if (!admin) return null;
+  const acting = accounts.find((a) => normalizeUsername(a.username) === normalizeUsername(admin.username));
+  if (
+    !acting ||
+    acting.role !== 'admin' ||
+    acting.is_active === false ||
+    !(await verifyPassword(admin.password, acting.salt, acting.password_hash))
+  ) {
+    throw new Error('Chỉ tài khoản quản trị (nhập đúng mật khẩu) mới có quyền thực hiện');
+  }
+  return acting;
+}
+
+function firstError(errors) {
+  return Object.values(errors)[0];
+}
+
+/**
+ * Đăng nhập: trả về thông tin an toàn của tài khoản hoặc null nếu sai thông tin / bị khoá
+ */
+export async function authenticateAccount(username, password) {
+  const uname = normalizeUsername(username);
+  if (!uname || !password) return null;
+
+  if (isDemoMode()) {
+    await ensureAccountsSeeded();
+    const acc = getStore(KEYS.ACCOUNTS, []).find((a) => normalizeUsername(a.username) === uname);
+    if (!acc || acc.is_active === false) return null;
+    if (!(await verifyPassword(password, acc.salt, acc.password_hash))) return null;
+    return safeAccount(acc);
+  }
+
+  const data = await callRpc('app_login', { p_username: uname, p_password: password });
+  return data || null;
+}
+
+/**
+ * Danh sách tài khoản (không kèm mật khẩu/băm)
+ * @param {{username: string, password: string}} [admin] bắt buộc ở chế độ Supabase
+ */
+export async function getAccounts(admin) {
+  if (isDemoMode()) {
+    await ensureAccountsSeeded();
+    const accounts = getStore(KEYS.ACCOUNTS, []);
+    await assertDemoAdmin(accounts, admin);
+    return accounts.map(safeAccount);
+  }
+  const data = await callRpc('app_list_accounts', adminRpcArgs(admin));
+  return data || [];
+}
+
+/**
+ * Tạo tài khoản mới
+ * @param {{username, password, full_name, role, team_id}} input
+ */
+export async function createAccount(input, admin) {
+  if (isDemoMode()) {
+    await ensureAccountsSeeded();
+    const accounts = getStore(KEYS.ACCOUNTS, []);
+    await assertDemoAdmin(accounts, admin);
+    const v = validateNewAccount(input, accounts);
+    if (!v.valid) throw new Error(firstError(v.errors));
+    const { salt, hash } = await hashPassword(v.sanitized.password);
+    const account = {
+      id: generateId(),
+      username: v.sanitized.username,
+      salt,
+      password_hash: hash,
+      full_name: v.sanitized.full_name,
+      role: v.sanitized.role,
+      team_id: v.sanitized.team_id,
+      is_active: true,
+      created_at: new Date().toISOString()
+    };
+    setStore(KEYS.ACCOUNTS, [...accounts, account]);
+    return safeAccount(account);
+  }
+
+  const v = validateNewAccount(input, []);
+  if (!v.valid) throw new Error(firstError(v.errors));
+  return callRpc('app_create_account', {
+    ...adminRpcArgs(admin),
+    p_username: v.sanitized.username,
+    p_password: v.sanitized.password,
+    p_full_name: v.sanitized.full_name,
+    p_role: v.sanitized.role,
+    p_team_id: v.sanitized.team_id
+  });
+}
+
+/**
+ * Cập nhật tài khoản: full_name, team_id, is_active, password (đặt lại mật khẩu)
+ */
+export async function updateAccount(id, updates = {}, admin) {
+  if (updates.password !== undefined && updates.password !== '') {
+    const pwError = validatePassword(updates.password);
+    if (pwError) throw new Error(pwError);
+  }
+
+  if (isDemoMode()) {
+    await ensureAccountsSeeded();
+    const accounts = getStore(KEYS.ACCOUNTS, []);
+    const acting = await assertDemoAdmin(accounts, admin);
+    const target = accounts.find((a) => String(a.id) === String(id));
+    if (!target) throw new Error('Không tìm thấy tài khoản');
+
+    if (updates.is_active === false && target.is_active !== false) {
+      const check = canToggleActive(accounts, target, acting);
+      if (!check.ok) throw new Error(check.reason);
+    }
+    if (updates.full_name !== undefined) {
+      const name = String(updates.full_name).trim();
+      if (!name) throw new Error('Vui lòng nhập họ tên');
+      target.full_name = name;
+    }
+    if (updates.team_id !== undefined && target.role === 'leader') {
+      if (!updates.team_id) throw new Error('Tổ trưởng bắt buộc phải thuộc một tổ');
+      target.team_id = updates.team_id;
+    }
+    if (updates.is_active !== undefined) target.is_active = Boolean(updates.is_active);
+    if (updates.password) {
+      const { salt, hash } = await hashPassword(updates.password);
+      target.salt = salt;
+      target.password_hash = hash;
+    }
+    setStore(KEYS.ACCOUNTS, accounts);
+    return safeAccount(target);
+  }
+
+  return callRpc('app_update_account', {
+    ...adminRpcArgs(admin),
+    p_id: id,
+    p_full_name: updates.full_name ?? null,
+    p_team_id: updates.team_id ?? null,
+    p_is_active: updates.is_active ?? null,
+    p_password: updates.password || null
+  });
+}
+
+/**
+ * Xoá tài khoản (không xoá chính mình / quản trị cuối cùng)
+ */
+export async function deleteAccount(id, admin) {
+  if (isDemoMode()) {
+    await ensureAccountsSeeded();
+    const accounts = getStore(KEYS.ACCOUNTS, []);
+    const acting = await assertDemoAdmin(accounts, admin);
+    const target = accounts.find((a) => String(a.id) === String(id));
+    const check = canDeleteAccount(accounts, target, acting);
+    if (!check.ok) throw new Error(check.reason);
+    setStore(KEYS.ACCOUNTS, accounts.filter((a) => String(a.id) !== String(id)));
+    return true;
+  }
+  await callRpc('app_delete_account', { ...adminRpcArgs(admin), p_id: id });
+  return true;
+}
+
+/**
+ * Người dùng tự đổi mật khẩu của mình
+ */
+export async function changeAccountPassword(username, oldPassword, newPassword) {
+  const pwError = validatePassword(newPassword);
+  if (pwError) throw new Error(pwError);
+
+  if (isDemoMode()) {
+    await ensureAccountsSeeded();
+    const accounts = getStore(KEYS.ACCOUNTS, []);
+    const acc = accounts.find((a) => normalizeUsername(a.username) === normalizeUsername(username));
+    if (!acc || !(await verifyPassword(oldPassword, acc.salt, acc.password_hash))) {
+      throw new Error('Mật khẩu hiện tại không đúng');
+    }
+    const { salt, hash } = await hashPassword(newPassword);
+    acc.salt = salt;
+    acc.password_hash = hash;
+    setStore(KEYS.ACCOUNTS, accounts);
+    return true;
+  }
+
+  await callRpc('app_change_password', {
+    p_username: normalizeUsername(username),
+    p_old_password: oldPassword,
+    p_new_password: newPassword
+  });
+  return true;
+}
+
 // Fallback mock Supabase client for demo mode
 function createMockSupabaseClient() {
   return {
@@ -712,6 +1034,15 @@ export default {
   upsertProducts,
   deleteProduct,
   getTeams,
+  createTeam,
+  updateTeam,
+  getAccounts,
+  createAccount,
+  updateAccount,
+  deleteAccount,
+  authenticateAccount,
+  changeAccountPassword,
+  resetAccounts,
   getEmployees,
   upsertEmployees,
   deleteEmployee,

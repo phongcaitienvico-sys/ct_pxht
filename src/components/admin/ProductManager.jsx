@@ -544,7 +544,7 @@ export default function ProductManager() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm theo Mã ID, Tên sản phẩm hoặc Khách hàng..."
+              placeholder="Tìm theo tên sản phẩm hoặc khách hàng..."
               className="w-full pl-10 pr-9 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800 placeholder-slate-400"
             />
             {searchTerm && (
@@ -697,12 +697,10 @@ export default function ProductManager() {
                     />
                   </th>
                   <th className="py-3.5 px-3 text-center w-36">Bật/Tắt Hôm Nay</th>
-                  <th className="py-3.5 px-3 w-28">Mã ID</th>
                   <th className="py-3.5 px-3">Tên Sản Phẩm</th>
                   <th className="py-3.5 px-3">Khách Hàng</th>
                   <th className="py-3.5 px-3 text-right">SL Đơn</th>
                   <th className="py-3.5 px-3 text-right">SL Phôi</th>
-                  <th className="py-3.5 px-3 text-center w-24">Trạng Thái</th>
                   <th className="py-3.5 pr-4 pl-3 text-center w-24">Hành Động</th>
                 </tr>
               </thead>
@@ -759,13 +757,6 @@ export default function ProductManager() {
                         </div>
                       </td>
 
-                      {/* ID */}
-                      <td className="py-3.5 px-3">
-                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200">
-                          {prod.id}
-                        </span>
-                      </td>
-
                       {/* Name */}
                       <td className="py-3.5 px-3">
                         <div className="font-semibold text-slate-900">{prod.name}</div>
@@ -795,21 +786,6 @@ export default function ProductManager() {
                           }`}
                         >
                           {Number(prod.blank_quantity || 0).toLocaleString('vi-VN')}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-3.5 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            prod.status === 'Sx'
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                              : prod.status === 'HoanThanh'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              : 'bg-amber-100 text-amber-800 border border-amber-200'
-                          }`}
-                        >
-                          {prod.status || 'Sx'}
                         </span>
                       </td>
 
@@ -933,21 +909,6 @@ export default function ProductManager() {
             </div>
 
             <form onSubmit={handleSaveProduct} className="p-6 space-y-4">
-              {/* Product ID */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mã ID Sản Phẩm <span className="text-slate-400 font-normal">(Để trống để tự tạo)</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.id}
-                  disabled={Boolean(editingProduct)}
-                  onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                  placeholder="Ví dụ: 1732 hoặc SP_01"
-                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-slate-800"
-                />
-              </div>
-
               {/* Product Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1014,22 +975,8 @@ export default function ProductManager() {
                 </div>
               </div>
 
-              {/* Status & Active Today Row */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Trạng Thái Sản Xuất
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 cursor-pointer"
-                  >
-                    <option value="Sx">Đang Sx (Sx)</option>
-                    <option value="HoanThanh">Hoàn Thành</option>
-                    <option value="TamDung">Tạm Dừng</option>
-                  </select>
-                </div>
+              {/* Active Today Row */}
+              <div className="pt-1">
                 <div className="flex flex-col justify-end">
                   <label className="inline-flex items-center space-x-2 p-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
                     <input

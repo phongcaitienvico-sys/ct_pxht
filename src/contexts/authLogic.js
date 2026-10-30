@@ -1,35 +1,12 @@
 /**
  * Auth Logic & Session Helpers
- * Core logic for role resolution, demo profiles, credentials validation, and session persistence.
+ * Đăng nhập bằng tên đăng nhập + mật khẩu (tài khoản lưu qua adapter supabase.js),
+ * phiên làm việc lưu ở localStorage (`pxht_session`) và chỉ chứa thông tin an toàn (không có mật khẩu/băm).
  */
 
-// Demo profiles as specified in architecture specs
-export const DEMO_PROFILES = {
-  admin: {
-    id: 'admin-1',
-    email: 'quandoc@pxht.vn',
-    role: 'admin',
-    name: 'Quản Đốc Phân Xưởng'
-  },
-  leader1: {
-    id: 'leader-1',
-    email: 'totruong1@pxht.vn',
-    role: 'leader',
-    name: 'Tổ Trưởng 1 (Nguyễn Văn A)',
-    teamId: 'team-1',
-    teamName: 'Tổ 1 - Cơ khí & Đúc'
-  },
-  leader2: {
-    id: 'leader-2',
-    email: 'totruong2@pxht.vn',
-    role: 'leader',
-    name: 'Tổ Trưởng 2 (Lê Văn B)',
-    teamId: 'team-2',
-    teamName: 'Tổ 2 - Gia công & Lắp ráp'
-  }
-};
+import { isDefaultCredentials } from '../components/admin/accountManagerLogic.js';
 
-// Map demo role team identifiers to database seed team UUIDs
+// Map demo team identifiers to database seed team UUIDs (tương thích dữ liệu cũ)
 export const DEMO_TEAM_MAP = {
   'team-1': 'a0000000-0000-0000-0000-000000000001',
   'team-2': 'a0000000-0000-0000-0000-000000000002'
@@ -40,7 +17,7 @@ export function resolveEffectiveTeamId(teamId) {
   return DEMO_TEAM_MAP[teamId] || teamId;
 }
 
-const AUTH_STORAGE_KEY = 'pxht_auth_user';
+export const AUTH_STORAGE_KEY = 'pxht_session';
 let inMemoryAuthUser = null;
 
 /**
@@ -59,13 +36,19 @@ export function getStoredUser() {
 }
 
 /**
- * Saves or clears the user profile in storage
+ * Saves or clears the user profile in storage (luôn loại bỏ trường nhạy cảm)
  */
 export function setStoredUser(user) {
+  let safe = null;
+  if (user) {
+    // eslint-disable-next-line no-unused-vars
+    const { password, password_hash, salt, ...rest } = user;
+    safe = rest;
+  }
   if (typeof localStorage !== 'undefined') {
     try {
-      if (user) {
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      if (safe) {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(safe));
       } else {
         localStorage.removeItem(AUTH_STORAGE_KEY);
       }
@@ -73,7 +56,7 @@ export function setStoredUser(user) {
       // Ignore localStorage errors (e.g. quota or sandbox)
     }
   }
-  inMemoryAuthUser = user ? JSON.parse(JSON.stringify(user)) : null;
+  inMemoryAuthUser = safe ? JSON.parse(JSON.stringify(safe)) : null;
 }
 
 /**
@@ -82,7 +65,6 @@ export function setStoredUser(user) {
 export function resolveUserRole(user) {
   if (!user) return null;
   if (user.role === 'admin') return 'admin';
-  if (user.role === 'leader') return 'leader';
   return 'leader';
 }
 
@@ -102,134 +84,100 @@ export function resolveUserTeam(user) {
 }
 
 /**
- * Switch demo profile logic by key ('admin' | 'leader1' | 'leader2')
+ * Validates username and password presence
  */
-export function switchDemoRoleLogic(key) {
-  const profile = DEMO_PROFILES[key];
-  if (!profile) {
-    throw new Error(
-      `Invalid demo role key: "${key}". Must be one of: 'admin', 'leader1', 'leader2'.`
-    );
-  }
-
-  const role = resolveUserRole(profile);
-  const currentTeam = resolveUserTeam(profile);
-  setStoredUser(profile);
-
-  return {
-    user: { ...profile },
-    role,
-    currentTeam
-  };
-}
-
-/**
- * Validates email and password format
- */
-export function validateCredentials(email, password) {
-  if (!email || !email.trim() || !password || !password.trim()) {
+export function validateCredentials(username, password) {
+  if (!username || !username.trim() || !password || !password.trim()) {
     return {
       valid: false,
-      error: 'Vui lòng nhập đầy đủ email và mật khẩu'
+      error: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu'
     };
   }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email.trim())) {
-    return {
-      valid: false,
-      error: 'Định dạng email không hợp lệ'
-    };
-  }
-
   return { valid: true };
 }
 
 /**
- * Login logic supporting both Demo profiles and Supabase Auth
+ * Chuyển tài khoản (an toàn) thành người dùng phiên làm việc
  */
-export async function loginLogic(email, password) {
-  const validation = validateCredentials(email, password);
-  if (!validation.valid) {
-    return {
-      success: false,
-      error: validation.error
-    };
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-
-  // 1. Check demo profiles first
-  const matchedDemo = Object.values(DEMO_PROFILES).find(
-    (p) => p.email.toLowerCase() === cleanEmail
-  );
-
-  if (matchedDemo) {
-    const user = { ...matchedDemo };
-    setStoredUser(user);
-    return {
-      success: true,
-      user,
-      role: resolveUserRole(user),
-      currentTeam: resolveUserTeam(user)
-    };
-  }
-
-  // 2. Fallback to Supabase Auth if not in demo mode
-  try {
-    const { isDemoMode, supabase } = await import('../lib/supabase.js');
-    if (!isDemoMode()) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password
-      });
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message || 'Đăng nhập không thành công'
-        };
-      }
-
-      const authUser = data.user;
-      const role = authUser?.user_metadata?.role || 'leader';
-      const user = {
-        id: authUser.id,
-        email: authUser.email,
-        role,
-        name: authUser.user_metadata?.name || authUser.email,
-        teamId: authUser.user_metadata?.teamId || null,
-        teamName: authUser.user_metadata?.teamName || null
-      };
-
-      setStoredUser(user);
-      return {
-        success: true,
-        user,
-        role: resolveUserRole(user),
-        currentTeam: resolveUserTeam(user)
-      };
-    }
-  } catch {
-    // If supabase import or connection fails, proceed to default fail response
-  }
-
+export function toSessionUser(account, teams = [], extra = {}) {
+  const team = account.team_id ? teams.find((t) => t.id === account.team_id) : null;
   return {
-    success: false,
-    error: 'Tài khoản hoặc mật khẩu không chính xác'
+    id: account.id,
+    username: account.username,
+    name: account.full_name,
+    full_name: account.full_name,
+    role: account.role,
+    teamId: account.team_id || null,
+    teamName: team ? team.name : account.team_id ? null : null,
+    defaultPassword: false,
+    ...extra
   };
 }
 
+function buildSession(user) {
+  return {
+    user,
+    role: resolveUserRole(user),
+    currentTeam: resolveUserTeam(user)
+  };
+}
+
+async function loadTeamsSafe() {
+  try {
+    const { getTeams } = await import('../lib/supabase.js');
+    return await getTeams();
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Load initial session from storage; defaults to DEMO_PROFILES.admin in demo mode
+ * Đăng nhập bằng tên đăng nhập + mật khẩu
  */
-export function loadAuthSession() {
-  let user = getStoredUser();
-  if (!user) {
-    user = DEMO_PROFILES.admin;
-    setStoredUser(user);
+export async function loginLogic(username, password) {
+  const validation = validateCredentials(username, password);
+  if (!validation.valid) {
+    return { success: false, error: validation.error };
   }
 
+  try {
+    const { authenticateAccount } = await import('../lib/supabase.js');
+    const account = await authenticateAccount(username, password);
+    if (!account) {
+      return { success: false, error: 'Tên đăng nhập hoặc mật khẩu không chính xác' };
+    }
+    const teams = account.team_id ? await loadTeamsSafe() : [];
+    const user = toSessionUser(account, teams, {
+      defaultPassword: account.role === 'admin' && isDefaultCredentials(username, password)
+    });
+    setStoredUser(user);
+    return { success: true, ...buildSession(user) };
+  } catch (err) {
+    return { success: false, error: err?.message || 'Không thể kết nối máy chủ' };
+  }
+}
+
+/**
+ * Đổi mật khẩu của chính người dùng đang đăng nhập
+ */
+export async function changePasswordLogic(user, oldPassword, newPassword) {
+  if (!user) return { success: false, error: 'Chưa đăng nhập' };
+  try {
+    const { changeAccountPassword } = await import('../lib/supabase.js');
+    await changeAccountPassword(user.username, oldPassword, newPassword);
+    const updated = { ...user, defaultPassword: false };
+    setStoredUser(updated);
+    return { success: true, user: updated };
+  } catch (err) {
+    return { success: false, error: err?.message || 'Không thể đổi mật khẩu' };
+  }
+}
+
+/**
+ * Load initial session from storage (không tự động đăng nhập)
+ */
+export function loadAuthSession() {
+  const user = getStoredUser();
   return {
     currentUser: user,
     role: resolveUserRole(user),
