@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { seedProducts, seedTeams, seedEmployees, seedLogs } from '../data/seedData.js';
+import { seedProducts, seedTeams, seedEmployees, seedLogs, getDynamicSeedLogs } from '../data/seedData.js';
 import { hashPassword, verifyPassword } from './passwordHash.js';
 import {
   DEFAULT_ADMIN,
@@ -96,30 +96,42 @@ export async function resetDemoData() {
   setStore(KEYS.PRODUCTS, seedProducts);
   setStore(KEYS.TEAMS, seedTeams);
   setStore(KEYS.EMPLOYEES, seedEmployees);
-  setStore(KEYS.LOGS, seedLogs);
+  const dynamicLogs = typeof getDynamicSeedLogs === 'function' ? getDynamicSeedLogs() : seedLogs;
+  setStore(KEYS.LOGS, dynamicLogs);
+  setStore('pxht_demo_version', 'pxht-seed-v4-today');
   return {
     products: seedProducts,
     teams: seedTeams,
     employees: seedEmployees,
-    logs: seedLogs
+    logs: dynamicLogs
   };
 }
 
 /**
  * Ensure demo store is initialized with seed data if empty
  */
+export const DEMO_DATA_VERSION = 'pxht-seed-v4-today';
+
 export async function initDemoData() {
+  const version = getStore('pxht_demo_version', null);
   const existingProducts = getStore(KEYS.PRODUCTS, null);
-  if (!existingProducts || !Array.isArray(existingProducts) || existingProducts.length === 0) {
+  const existingLogs = getStore(KEYS.LOGS, null);
+
+  if (
+    version !== DEMO_DATA_VERSION ||
+    !existingProducts ||
+    !Array.isArray(existingProducts) ||
+    existingProducts.length === 0 ||
+    !existingLogs ||
+    !Array.isArray(existingLogs) ||
+    existingLogs.length <= 2
+  ) {
     await resetDemoData();
   }
 }
 
 async function ensureDemoInitialized() {
-  const existingProducts = getStore(KEYS.PRODUCTS, null);
-  if (!existingProducts || !Array.isArray(existingProducts) || existingProducts.length === 0) {
-    await resetDemoData();
-  }
+  await initDemoData();
 }
 
 // ==============================================================================

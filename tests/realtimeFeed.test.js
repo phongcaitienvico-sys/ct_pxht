@@ -114,6 +114,16 @@ console.log('1. Testing calculateTodayKPI...');
 }
 
 {
+  // Test KPI calculation for all dates
+  const allKpi = calculateTodayKPI(mockLogs, 'all');
+  assert.strictEqual(allKpi.totalQuantity, 63, 'Total quantity all should be 63 (55 + 8)');
+  assert.strictEqual(allKpi.totalHours, 25.5, 'Total hours all should be 25.5 (18.5 + 7.0)');
+  assert.strictEqual(allKpi.activeWorkersCount, 4, 'Active workers count all should be 4');
+  assert.strictEqual(allKpi.activeTeamsCount, 2, 'Active teams count all should be 2');
+  assert.strictEqual(allKpi.totalLogsCount, 5, 'Total logs count all should be 5');
+}
+
+{
   // Test KPI calculation with string quantities/hours and edge cases
   const dirtyLogs = [
     { log_date: '2026-10-30', employee_id: 'e1', team_id: 't1', quantity: '12', duration_hours: '3.5' },

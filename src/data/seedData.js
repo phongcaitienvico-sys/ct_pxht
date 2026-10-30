@@ -191,85 +191,101 @@ export const seedProducts = [
   }
 ];
 
-export const seedLogs = [
-  {
-    id: 'l0000000-0000-0000-0000-000000000001',
-    log_date: '2026-10-30',
-    team_id: 'a0000000-0000-0000-0000-000000000001',
-    employee_id: 'e0000000-0000-0000-0000-000000000001',
-    product_id: '1732',
-    quantity: 4,
-    duration_hours: 3.5,
-    notes: 'Tiện khỏa mặt & doa lỗ',
-    created_at: '2026-10-30T08:15:00.000Z'
-  },
-  {
-    id: 'l0000000-0000-0000-0000-000000000002',
-    log_date: '2026-10-30',
-    team_id: 'a0000000-0000-0000-0000-000000000001',
-    employee_id: 'e0000000-0000-0000-0000-000000000001',
-    product_id: '1733',
-    quantity: 1,
-    duration_hours: 4.0,
-    notes: 'Gia công gối đỡ bi',
-    created_at: '2026-10-30T10:30:00.000Z'
-  },
-  {
-    id: 'l0000000-0000-0000-0000-000000000003',
-    log_date: '2026-10-30',
-    team_id: 'a0000000-0000-0000-0000-000000000001',
-    employee_id: 'e0000000-0000-0000-0000-000000000002',
-    product_id: '1775',
-    quantity: 20,
-    duration_hours: 7.5,
-    notes: 'Phay rãnh cánh búa',
-    created_at: '2026-10-30T09:00:00.000Z'
-  },
-  {
-    id: 'l0000000-0000-0000-0000-000000000004',
-    log_date: '2026-10-30',
-    team_id: 'a0000000-0000-0000-0000-000000000002',
-    employee_id: 'e0000000-0000-0000-0000-000000000004',
-    product_id: '1816',
-    quantity: 3,
-    duration_hours: 6.0,
-    notes: 'Tiện tinh moay ơ đĩa búa',
-    created_at: '2026-10-30T08:45:00.000Z'
-  },
-  {
-    id: 'l0000000-0000-0000-0000-000000000005',
-    log_date: '2026-10-29',
-    team_id: 'a0000000-0000-0000-0000-000000000001',
-    employee_id: 'e0000000-0000-0000-0000-000000000001',
-    product_id: '1732',
-    quantity: 2,
-    duration_hours: 4.0,
-    notes: 'Gia công nhiệt luyện',
-    created_at: '2026-10-29T08:30:00.000Z'
-  },
-  {
-    id: 'l0000000-0000-0000-0000-000000000006',
-    log_date: '2026-10-29',
-    team_id: 'a0000000-0000-0000-0000-000000000001',
-    employee_id: 'e0000000-0000-0000-0000-000000000002',
-    product_id: '1775',
-    quantity: 15,
-    duration_hours: 6.5,
-    notes: 'Phay tinh bề mặt',
-    created_at: '2026-10-29T10:15:00.000Z'
-  },
-  {
-    id: 'l0000000-0000-0000-0000-000000000007',
-    log_date: '2026-10-29',
-    team_id: 'a0000000-0000-0000-0000-000000000002',
-    employee_id: 'e0000000-0000-0000-0000-000000000005',
-    product_id: '1462',
-    quantity: 5,
-    duration_hours: 7.0,
-    notes: 'Khoan lỗ bắt bu lông',
-    created_at: '2026-10-29T09:30:00.000Z'
-  }
-];
+export function getSeedDate(daysAgo = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getDynamicSeedLogs() {
+  const today = getSeedDate(0);
+  const yesterday = getSeedDate(1);
+
+  return [
+    {
+      id: 'l0000000-0000-0000-0000-000000000001',
+      log_date: today,
+      team_id: 'a0000000-0000-0000-0000-000000000001',
+      employee_id: 'e0000000-0000-0000-0000-000000000001',
+      product_id: '1732',
+      quantity: 4,
+      duration_hours: 3.5,
+      notes: 'Tiện khỏa mặt & doa lỗ',
+      created_at: `${today}T08:15:00.000Z`
+    },
+    {
+      id: 'l0000000-0000-0000-0000-000000000002',
+      log_date: today,
+      team_id: 'a0000000-0000-0000-0000-000000000001',
+      employee_id: 'e0000000-0000-0000-0000-000000000001',
+      product_id: '1733',
+      quantity: 1,
+      duration_hours: 4.0,
+      notes: 'Gia công gối đỡ bi',
+      created_at: `${today}T10:30:00.000Z`
+    },
+    {
+      id: 'l0000000-0000-0000-0000-000000000003',
+      log_date: today,
+      team_id: 'a0000000-0000-0000-0000-000000000001',
+      employee_id: 'e0000000-0000-0000-0000-000000000002',
+      product_id: '1775',
+      quantity: 20,
+      duration_hours: 7.5,
+      notes: 'Phay rãnh cánh búa',
+      created_at: `${today}T09:00:00.000Z`
+    },
+    {
+      id: 'l0000000-0000-0000-0000-000000000004',
+      log_date: today,
+      team_id: 'a0000000-0000-0000-0000-000000000002',
+      employee_id: 'e0000000-0000-0000-0000-000000000004',
+      product_id: '1816',
+      quantity: 3,
+      duration_hours: 6.0,
+      notes: 'Tiện tinh moay ơ đĩa búa',
+      created_at: `${today}T08:45:00.000Z`
+    },
+    {
+      id: 'l0000000-0000-0000-0000-000000000005',
+      log_date: yesterday,
+      team_id: 'a0000000-0000-0000-0000-000000000001',
+      employee_id: 'e0000000-0000-0000-0000-000000000001',
+      product_id: '1732',
+      quantity: 2,
+      duration_hours: 4.0,
+      notes: 'Gia công nhiệt luyện',
+      created_at: `${yesterday}T08:30:00.000Z`
+    },
+    {
+      id: 'l0000000-0000-0000-0000-000000000006',
+      log_date: yesterday,
+      team_id: 'a0000000-0000-0000-0000-000000000001',
+      employee_id: 'e0000000-0000-0000-0000-000000000002',
+      product_id: '1775',
+      quantity: 15,
+      duration_hours: 6.5,
+      notes: 'Phay tinh bề mặt',
+      created_at: `${yesterday}T10:15:00.000Z`
+    },
+    {
+      id: 'l0000000-0000-0000-0000-000000000007',
+      log_date: yesterday,
+      team_id: 'a0000000-0000-0000-0000-000000000002',
+      employee_id: 'e0000000-0000-0000-0000-000000000005',
+      product_id: '1462',
+      quantity: 5,
+      duration_hours: 7.0,
+      notes: 'Khoan lỗ bắt bu lông',
+      created_at: `${yesterday}T09:30:00.000Z`
+    }
+  ];
+}
+
+export const seedLogs = getDynamicSeedLogs();
 
 export default {
   seedTeams,

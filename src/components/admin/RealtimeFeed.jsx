@@ -9,6 +9,7 @@ import {
   Search,
   Filter,
   RefreshCw,
+  RotateCcw,
   Edit2,
   Trash2,
   CheckCircle2,
@@ -29,7 +30,9 @@ import {
   getProducts,
   updateProductionLog,
   deleteProductionLog,
-  subscribeToLogs
+  subscribeToLogs,
+  resetDemoData,
+  isDemoMode
 } from '../../lib/supabase.js';
 
 import { exportProductionReportToExcel } from '../../lib/excel.js';
@@ -149,10 +152,35 @@ export default function RealtimeFeed() {
     return 'all';
   }, [dateFilter, customDate, todayStr]);
 
-  // Real-time KPI Calculation for Today
-  const todayKPI = useMemo(() => {
-    return calculateTodayKPI(logs, todayStr);
-  }, [logs, todayStr]);
+  // Helper to format date display YYYY-MM-DD -> DD/MM/YYYY
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr || dateStr === 'all') return '';
+    const parts = String(dateStr).split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  // Real-time KPI Calculation for active filter date (today, all, or custom)
+  const currentKPI = useMemo(() => {
+    return calculateTodayKPI(logs, activeFilterDate);
+  }, [logs, activeFilterDate]);
+
+  // Handle Reset Demo Data
+  const handleResetDemoData = async () => {
+    try {
+      setRefreshing(true);
+      await resetDemoData();
+      await loadData(true);
+      showToast('success', 'Đã nạp lại dữ liệu mẫu thành công với các bản ghi hôm nay!');
+    } catch (err) {
+      console.error('Reset demo error:', err);
+      showToast('error', 'Không thể nạp lại dữ liệu mẫu: ' + (err.message || 'Lỗi'));
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Filtered Logs
   const filteredLogs = useMemo(() => {
@@ -306,6 +334,19 @@ export default function RealtimeFeed() {
             <span className="hidden md:inline">Đồng bộ lại</span>
           </button>
 
+          {/* Reset Demo Data Button */}
+          {isDemoMode() && (
+            <button
+              onClick={handleResetDemoData}
+              disabled={loading || refreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+              title="Khôi phục lại dữ liệu mẫu ban đầu (kèm sản lượng hôm nay)"
+            >
+              <RotateCcw className="w-4 h-4 text-amber-600" />
+              <span className="hidden md:inline">Nạp lại mẫu</span>
+            </button>
+          )}
+
           {/* Export Excel Button */}
           <button
             onClick={handleExportExcel}
@@ -324,7 +365,11 @@ export default function RealtimeFeed() {
         <div className="bg-white p-4 rounded-xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/30 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-              Sản Lượng Hôm Nay
+              {dateFilter === 'today'
+                ? 'Sản Lượng Hôm Nay'
+                : dateFilter === 'all'
+                ? 'Tổng Sản Lượng (Tất Cả)'
+                : `Sản Lượng Ngày ${formatDisplayDate(customDate)}`}
             </span>
             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
               <Package className="w-4 h-4" />
@@ -332,12 +377,12 @@ export default function RealtimeFeed() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-blue-900">
-              {todayKPI.totalQuantity.toLocaleString('vi-VN')}
+              {currentKPI.totalQuantity.toLocaleString('vi-VN')}
             </span>
             <span className="text-xs font-medium text-blue-600">sản phẩm</span>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            Gồm {todayKPI.totalLogsCount} lượt ghi nhận
+            Gồm {currentKPI.totalLogsCount} lượt ghi nhận {dateFilter === 'today' ? 'hôm nay' : dateFilter === 'all' ? 'toàn bộ' : 'trong ngày'}
           </div>
         </div>
 
@@ -353,7 +398,7 @@ export default function RealtimeFeed() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-indigo-900">
-              {todayKPI.totalHours}
+              {currentKPI.totalHours}
             </span>
             <span className="text-xs font-medium text-indigo-600">giờ</span>
           </div>
@@ -374,7 +419,7 @@ export default function RealtimeFeed() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-emerald-900">
-              {todayKPI.activeWorkersCount}
+              {currentKPI.activeWorkersCount}
             </span>
             <span className="text-xs font-medium text-emerald-600">thợ</span>
           </div>
@@ -395,7 +440,7 @@ export default function RealtimeFeed() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-amber-900">
-              {todayKPI.activeTeamsCount}
+              {currentKPI.activeTeamsCount}
             </span>
             <span className="text-xs font-medium text-amber-600">
               / {teams.length} tổ

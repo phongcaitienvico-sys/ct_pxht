@@ -50,7 +50,7 @@ export function calculateTodayKPI(logs = [], targetDate = null) {
     };
   }
 
-  const effectiveDate = targetDate || getTodayDateString();
+  const effectiveDate = targetDate === 'all' ? 'all' : (targetDate || getTodayDateString());
 
   let totalQuantity = 0;
   let totalHours = 0;
@@ -67,7 +67,7 @@ export function calculateTodayKPI(logs = [], targetDate = null) {
       log.log_date ||
       (log.created_at ? String(log.created_at).slice(0, 10) : '');
 
-    if (logDate !== effectiveDate) {
+    if (effectiveDate !== 'all' && logDate !== effectiveDate) {
       continue;
     }
 
