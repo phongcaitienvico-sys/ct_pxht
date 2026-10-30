@@ -175,13 +175,13 @@ async function runE2ETests() {
   // Step 7: Tổ trưởng đăng nhập bằng tài khoản (tên đăng nhập + mật khẩu) & kiểm tra danh sách thợ trong tổ
   resetAccounts();
   await createAccount({
-    username: 'totruong1',
+    username: 'totruong_e2e',
     password: 'matkhau1',
     full_name: 'Tổ Trưởng 1',
     role: 'leader',
     team_id: 'a0000000-0000-0000-0000-000000000001'
   });
-  const leader1Session = await loginLogic('totruong1', 'matkhau1');
+  const leader1Session = await loginLogic('totruong_e2e', 'matkhau1');
   assert.strictEqual(leader1Session.success, true, 'Leader account must log in');
   assert.strictEqual(leader1Session.role, 'leader', 'Leader account must resolve role leader');
   assert.strictEqual(

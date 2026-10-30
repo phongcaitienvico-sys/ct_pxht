@@ -1,6 +1,6 @@
 /**
  * Dữ liệu hạt giống ban đầu (Seed Data)
- * Trích xuất từ bảng theo dõi sản xuất thực tế của Quản đốc xưởng
+ * Trích xuất từ bảng theo dõi sản xuất thực tế của Phân Xưởng Hoàn Thiện
  */
 
 export const seedTeams = [
@@ -13,6 +13,11 @@ export const seedTeams = [
     id: 'a0000000-0000-0000-0000-000000000002',
     name: 'Tổ 2 - Tiện & Phay',
     leader_email: 'to2@xuong.vn'
+  },
+  {
+    id: 'a0000000-0000-0000-0000-000000000003',
+    name: 'Tổ 3 - Hàn & Hoàn thiện',
+    leader_email: 'to3@xuong.vn'
   }
 ];
 
@@ -58,6 +63,20 @@ export const seedEmployees = [
     full_name: 'Đỗ Quốc Việt',
     team_id: 'a0000000-0000-0000-0000-000000000002',
     is_active: true
+  },
+  {
+    id: 'e0000000-0000-0000-0000-000000000007',
+    code: 'NV07',
+    full_name: 'Vũ Hải Nam',
+    team_id: 'a0000000-0000-0000-0000-000000000003',
+    is_active: true
+  },
+  {
+    id: 'e0000000-0000-0000-0000-000000000008',
+    code: 'NV08',
+    full_name: 'Bùi Quang Sáng',
+    team_id: 'a0000000-0000-0000-0000-000000000003',
+    is_active: true
   }
 ];
 
@@ -87,7 +106,7 @@ export const seedProducts = [
     order_quantity: 64,
     blank_quantity: 16,
     status: 'Sx',
-    is_active_today: false
+    is_active_today: true
   },
   {
     id: '1775',
@@ -142,12 +161,83 @@ export const seedProducts = [
     blank_quantity: 4,
     status: 'Sx',
     is_active_today: true
+  },
+  {
+    id: '714',
+    name: 'Búa nghiền 685x98x35',
+    customer: 'Hải Vinh Quảng Ninh',
+    order_quantity: 500,
+    blank_quantity: 120,
+    status: 'Sx',
+    is_active_today: true
+  },
+  {
+    id: '1820',
+    name: 'Vành tỳ con lăn lò quay (Φ2200x500)',
+    customer: 'Xi Măng Cẩm Phả',
+    order_quantity: 2,
+    blank_quantity: 2,
+    status: 'Sx',
+    is_active_today: false
+  },
+  {
+    id: '1825',
+    name: 'Trục cán thô thép tấm (Φ450 dài 2800)',
+    customer: 'Thép Hoà Phát',
+    order_quantity: 6,
+    blank_quantity: 6,
+    status: 'Sx',
+    is_active_today: true
   }
 ];
 
 export const seedLogs = [
   {
     id: 'l0000000-0000-0000-0000-000000000001',
+    log_date: '2026-10-30',
+    team_id: 'a0000000-0000-0000-0000-000000000001',
+    employee_id: 'e0000000-0000-0000-0000-000000000001',
+    product_id: '1732',
+    quantity: 4,
+    duration_hours: 3.5,
+    notes: 'Tiện khỏa mặt & doa lỗ',
+    created_at: '2026-10-30T08:15:00.000Z'
+  },
+  {
+    id: 'l0000000-0000-0000-0000-000000000002',
+    log_date: '2026-10-30',
+    team_id: 'a0000000-0000-0000-0000-000000000001',
+    employee_id: 'e0000000-0000-0000-0000-000000000001',
+    product_id: '1733',
+    quantity: 1,
+    duration_hours: 4.0,
+    notes: 'Gia công gối đỡ bi',
+    created_at: '2026-10-30T10:30:00.000Z'
+  },
+  {
+    id: 'l0000000-0000-0000-0000-000000000003',
+    log_date: '2026-10-30',
+    team_id: 'a0000000-0000-0000-0000-000000000001',
+    employee_id: 'e0000000-0000-0000-0000-000000000002',
+    product_id: '1775',
+    quantity: 20,
+    duration_hours: 7.5,
+    notes: 'Phay rãnh cánh búa',
+    created_at: '2026-10-30T09:00:00.000Z'
+  },
+  {
+    id: 'l0000000-0000-0000-0000-000000000004',
+    log_date: '2026-10-30',
+    team_id: 'a0000000-0000-0000-0000-000000000002',
+    employee_id: 'e0000000-0000-0000-0000-000000000004',
+    product_id: '1816',
+    quantity: 3,
+    duration_hours: 6.0,
+    notes: 'Tiện tinh moay ơ đĩa búa',
+    created_at: '2026-10-30T08:45:00.000Z'
+  },
+  {
+    id: 'l0000000-0000-0000-0000-000000000005',
     log_date: '2026-10-29',
     team_id: 'a0000000-0000-0000-0000-000000000001',
     employee_id: 'e0000000-0000-0000-0000-000000000001',
@@ -158,7 +248,7 @@ export const seedLogs = [
     created_at: '2026-10-29T08:30:00.000Z'
   },
   {
-    id: 'l0000000-0000-0000-0000-000000000002',
+    id: 'l0000000-0000-0000-0000-000000000006',
     log_date: '2026-10-29',
     team_id: 'a0000000-0000-0000-0000-000000000001',
     employee_id: 'e0000000-0000-0000-0000-000000000002',
@@ -167,6 +257,17 @@ export const seedLogs = [
     duration_hours: 6.5,
     notes: 'Phay tinh bề mặt',
     created_at: '2026-10-29T10:15:00.000Z'
+  },
+  {
+    id: 'l0000000-0000-0000-0000-000000000007',
+    log_date: '2026-10-29',
+    team_id: 'a0000000-0000-0000-0000-000000000002',
+    employee_id: 'e0000000-0000-0000-0000-000000000005',
+    product_id: '1462',
+    quantity: 5,
+    duration_hours: 7.0,
+    notes: 'Khoan lỗ bắt bu lông',
+    created_at: '2026-10-29T09:30:00.000Z'
   }
 ];
 

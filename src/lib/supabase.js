@@ -764,16 +764,41 @@ async function ensureAccountsSeeded() {
   if (Array.isArray(existing) && existing.length > 0) return;
   if (!seedingAccounts) {
     seedingAccounts = (async () => {
-      const { salt, hash } = await hashPassword(DEFAULT_ADMIN.password);
+      const adminCreds = await hashPassword(DEFAULT_ADMIN.password);
+      const leader1Creds = await hashPassword('123456');
+      const leader2Creds = await hashPassword('123456');
+
       setStore(KEYS.ACCOUNTS, [
         {
           id: generateId(),
           username: DEFAULT_ADMIN.username,
-          salt,
-          password_hash: hash,
+          salt: adminCreds.salt,
+          password_hash: adminCreds.hash,
           full_name: DEFAULT_ADMIN.full_name,
           role: 'admin',
           team_id: null,
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        {
+          id: generateId(),
+          username: 'totruong1',
+          salt: leader1Creds.salt,
+          password_hash: leader1Creds.hash,
+          full_name: 'Nguyễn Văn An (Tổ 1)',
+          role: 'leader',
+          team_id: 'a0000000-0000-0000-0000-000000000001',
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        {
+          id: generateId(),
+          username: 'totruong2',
+          salt: leader2Creds.salt,
+          password_hash: leader2Creds.hash,
+          full_name: 'Lê Văn Bình (Tổ 2)',
+          role: 'leader',
+          team_id: 'a0000000-0000-0000-0000-000000000002',
           is_active: true,
           created_at: new Date().toISOString()
         }

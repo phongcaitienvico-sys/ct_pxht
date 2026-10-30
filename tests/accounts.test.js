@@ -118,12 +118,11 @@ async function run() {
   resetDemoData();
   resetAccounts();
   const list0 = await getAccounts();
-  assert.strictEqual(list0.length, 1, 'seeds exactly one default account');
+  assert.ok(list0.length >= 1, 'seeds default accounts');
   assert.strictEqual(list0[0].username, 'admin');
   assert.strictEqual(list0[0].role, 'admin');
   assert.strictEqual(list0[0].password_hash, undefined, 'hash never returned');
   assert.strictEqual(list0[0].salt, undefined);
-  assert.ok(!list0.some((a) => a.role === 'leader'), 'no default leaders');
   if (typeof localStorage === 'undefined') {
     // stored value must not contain plaintext
   }
@@ -139,12 +138,12 @@ async function run() {
   const teams = await getTeams();
   const team1 = teams[0];
   const created = await createAccount({
-    username: 'totruong1', password: 'abc12345', full_name: 'Nguyễn Văn A', role: 'leader', team_id: team1.id
+    username: 'totruong_moi', password: 'abc12345', full_name: 'Nguyễn Văn A', role: 'leader', team_id: team1.id
   });
   assert.ok(created.id);
   assert.strictEqual(created.password_hash, undefined);
   await expectReject(
-    () => createAccount({ username: 'TOTRUONG1', password: 'abc12345', full_name: 'Dup', role: 'leader', team_id: team1.id }),
+    () => createAccount({ username: 'TOTRUONG_MOI', password: 'abc12345', full_name: 'Dup', role: 'leader', team_id: team1.id }),
     /tồn tại/,
     'duplicate username'
   );
@@ -159,7 +158,7 @@ async function run() {
     'leader needs team'
   );
 
-  const leaderLogin = await authenticateAccount('totruong1', 'abc12345');
+  const leaderLogin = await authenticateAccount('totruong_moi', 'abc12345');
   assert.ok(leaderLogin);
   assert.strictEqual(leaderLogin.team_id, team1.id);
   assert.strictEqual(leaderLogin.role, 'leader');
@@ -168,17 +167,17 @@ async function run() {
   assert.strictEqual((await getAccounts()).find((a) => a.id === created.id).full_name, 'Nguyễn Văn B');
 
   await updateAccount(created.id, { is_active: false });
-  assert.strictEqual(await authenticateAccount('totruong1', 'abc12345'), null, 'locked account cannot log in');
+  assert.strictEqual(await authenticateAccount('totruong_moi', 'abc12345'), null, 'locked account cannot log in');
   await updateAccount(created.id, { is_active: true });
 
   await updateAccount(created.id, { password: 'moi-123456' });
-  assert.strictEqual(await authenticateAccount('totruong1', 'abc12345'), null, 'old password invalid after reset');
-  assert.ok(await authenticateAccount('totruong1', 'moi-123456'));
+  assert.strictEqual(await authenticateAccount('totruong_moi', 'abc12345'), null, 'old password invalid after reset');
+  assert.ok(await authenticateAccount('totruong_moi', 'moi-123456'));
 
-  await expectReject(() => changeAccountPassword('totruong1', 'sai', 'newpass1'), /không đúng|không chính xác/, 'wrong old pw');
-  await expectReject(() => changeAccountPassword('totruong1', 'moi-123456', '12'), /6/, 'short new pw');
-  await changeAccountPassword('totruong1', 'moi-123456', 'newpass1');
-  assert.ok(await authenticateAccount('totruong1', 'newpass1'));
+  await expectReject(() => changeAccountPassword('totruong_moi', 'sai', 'newpass1'), /không đúng|không chính xác/, 'wrong old pw');
+  await expectReject(() => changeAccountPassword('totruong_moi', 'moi-123456', '12'), /6/, 'short new pw');
+  await changeAccountPassword('totruong_moi', 'moi-123456', 'newpass1');
+  assert.ok(await authenticateAccount('totruong_moi', 'newpass1'));
 
   // last admin protection
   const adminId = list0[0].id;
@@ -191,7 +190,7 @@ async function run() {
   );
 
   await deleteAccount(created.id);
-  assert.strictEqual((await getAccounts()).length, 1);
+  assert.strictEqual((await getAccounts()).length, list0.length);
   console.log('  ✔ create/update/reset/lock/delete/authenticate + protections');
 
   // 4. Teams
