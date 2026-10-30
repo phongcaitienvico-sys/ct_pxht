@@ -433,7 +433,7 @@ export default function EmployeeManager() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           {/* Refresh Button */}
           <button
             onClick={() => fetchData(true)}
@@ -475,7 +475,7 @@ export default function EmployeeManager() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
             <Users className="w-5 h-5" />
@@ -603,7 +603,8 @@ export default function EmployeeManager() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
@@ -717,6 +718,78 @@ export default function EmployeeManager() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Employee Cards (< md) */}
+          <div className="md:hidden divide-y divide-slate-100 p-2.5 space-y-2.5">
+            {filteredEmployees.map((emp) => {
+              const teamName = teamMap.get(emp.team_id) || 'Chưa phân tổ';
+              const initials = emp.full_name
+                ? emp.full_name
+                    .split(' ')
+                    .filter(Boolean)
+                    .slice(-2)
+                    .map((n) => n[0])
+                    .join('')
+                    .toUpperCase()
+                : 'NV';
+
+              return (
+                <div
+                  key={emp.id || emp.code}
+                  className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        {initials}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">{emp.full_name}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="font-mono text-xs font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                            {emp.code}
+                          </span>
+                          <span className="text-xs text-blue-700 font-medium">
+                            {teamName}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(emp)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                        emp.is_active
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}
+                    >
+                      {emp.is_active ? '✓ Hoạt động' : 'Tạm nghỉ'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => handleOpenEditModal(emp)}
+                      className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Sửa
+                    </button>
+                    <button
+                      onClick={() => setDeletingEmployee(emp)}
+                      className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
       </div>
 

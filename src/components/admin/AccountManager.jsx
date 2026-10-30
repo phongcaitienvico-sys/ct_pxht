@@ -216,7 +216,7 @@ export default function AccountManager() {
               />
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-600 border-b border-slate-200">
@@ -300,6 +300,94 @@ export default function AccountManager() {
                   })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Account Cards (< md) */}
+          <div className="md:hidden divide-y divide-slate-100 p-2.5 space-y-2.5">
+            {loading && <div className="py-6 text-center text-slate-500 text-sm">Đang tải...</div>}
+            {!loading && visible.length === 0 && (
+              <div className="py-6 text-center text-slate-500 text-sm">Không có tài khoản nào.</div>
+            )}
+            {!loading &&
+              visible.map((acc) => {
+                const isSelf = String(acc.id) === String(currentUser?.id);
+                const active = acc.is_active !== false;
+
+                return (
+                  <div key={acc.id} className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-900">
+                          <span>{acc.username}</span>
+                          {isSelf && <span className="text-[10px] font-sans font-semibold text-blue-600">(Bạn)</span>}
+                        </div>
+                        <div className="text-sm font-semibold text-slate-800 mt-0.5">{acc.full_name}</div>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <RoleBadge role={acc.role} />
+                          {acc.role === 'leader' && (
+                            <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                              {teamName(acc.team_id)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {active ? 'Hoạt động' : 'Đã khóa'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1 mt-3 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        title="Sửa thông tin"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg"
+                        onClick={() => setModal({ type: 'edit', account: acc })}
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                        Sửa
+                      </button>
+                      <button
+                        type="button"
+                        title="Đặt lại mật khẩu"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"
+                        onClick={() => setModal({ type: 'password', account: acc })}
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        Đổi MK
+                      </button>
+                      <button
+                        type="button"
+                        title={active ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+                        className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                        onClick={() => {
+                          const check = canToggleActive(accounts, acc, currentUser);
+                          if (!check.ok) return notify('error', check.reason);
+                          run(() => updateAccount(acc.id, { is_active: !active }, admin), active ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản');
+                        }}
+                      >
+                        {active ? <Lock className="w-4 h-4 text-slate-500" /> : <Unlock className="w-4 h-4 text-emerald-600" />}
+                      </button>
+                      <button
+                        type="button"
+                        title="Xóa tài khoản"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                        onClick={() => {
+                          const check = canDeleteAccount(accounts, acc, currentUser);
+                          if (!check.ok) return notify('error', check.reason);
+                          setModal({ type: 'delete', account: acc });
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}

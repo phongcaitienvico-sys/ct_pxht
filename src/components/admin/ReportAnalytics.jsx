@@ -421,9 +421,9 @@ export default function ReportAnalytics() {
 
       {/* KPI Summary Cards */}
       <div className="max-w-7xl mx-auto mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {/* Card 1: Work Days */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 flex-shrink-0">
               <Calendar className="w-6 h-6" />
             </div>
@@ -444,7 +444,7 @@ export default function ReportAnalytics() {
           </div>
 
           {/* Card 2: Total Quantity */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 flex-shrink-0">
               <Package className="w-6 h-6" />
             </div>
@@ -465,7 +465,7 @@ export default function ReportAnalytics() {
           </div>
 
           {/* Card 3: Total Hours */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 flex-shrink-0">
               <Clock className="w-6 h-6" />
             </div>
@@ -486,7 +486,7 @@ export default function ReportAnalytics() {
           </div>
 
           {/* Card 4: Average Productivity */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-100 flex-shrink-0">
               <TrendingUp className="w-6 h-6" />
             </div>
@@ -692,7 +692,7 @@ export default function ReportAnalytics() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200">
                   <tr>
@@ -771,6 +771,62 @@ export default function ReportAnalytics() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Employee Summary Cards (< md) */}
+            <div className="md:hidden divide-y divide-slate-100 p-2.5 space-y-2.5">
+              {employeeSummaries.map((emp, index) => (
+                <div
+                  key={emp.employeeCode || index}
+                  onClick={() => {
+                    if (emp.employeeId) {
+                      setSelectedEmployeeId(emp.employeeId);
+                    } else {
+                      setSelectedEmployeeId(emp.employeeCode);
+                    }
+                  }}
+                  className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs cursor-pointer active:bg-blue-50/50 transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-mono text-[10px] font-bold">
+                          {index + 1}
+                        </span>
+                        <span className="font-mono text-xs font-bold text-blue-600">
+                          #{emp.employeeCode}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-slate-900 mt-1">{emp.employeeName}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{emp.teamName || '—'}</div>
+                    </div>
+
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                      {emp.workDaysCount} ngày làm
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-center">
+                    <div className="bg-slate-50 p-1.5 rounded-lg">
+                      <div className="text-[10px] uppercase font-semibold text-slate-400">Tổng SP</div>
+                      <div className="text-sm font-bold text-slate-900">{formatNumber(emp.totalQuantity)}</div>
+                    </div>
+                    <div className="bg-slate-50 p-1.5 rounded-lg">
+                      <div className="text-[10px] uppercase font-semibold text-slate-400">Tổng Giờ</div>
+                      <div className="text-sm font-bold text-slate-900">{emp.totalHours}h</div>
+                    </div>
+                    <div className="bg-emerald-50 p-1.5 rounded-lg border border-emerald-100">
+                      <div className="text-[10px] uppercase font-semibold text-emerald-600">Năng Suất</div>
+                      <div className="text-sm font-bold text-emerald-700">{emp.productivityPerHour}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1 mt-2.5 pt-2 border-t border-slate-100 text-xs font-semibold text-blue-600">
+                    <span>Xem lịch sử từng ngày</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

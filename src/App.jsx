@@ -124,9 +124,9 @@ function MainAppShell() {
         </div>
       )}
 
-      <main className={`flex-1 w-full pt-4 ${role === 'leader' ? 'pb-24 lg:pb-12' : 'pb-12'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {isMobileFrame && role === 'leader' ? (
+      <main className="flex-1 w-full pt-3 sm:pt-4 pb-24 lg:pb-12">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          {isMobileFrame ? (
             <div className="flex justify-center py-2 animate-fadeIn">
               <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border-4 border-slate-800 p-2 overflow-hidden">
                 <div className="w-20 h-1 bg-slate-300 rounded-full mx-auto mb-3 mt-1" />

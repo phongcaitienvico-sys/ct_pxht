@@ -442,13 +442,13 @@ export default function ProductManager() {
       )}
 
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="flex items-center space-x-3">
           <div className="p-3 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl text-white shadow-md shadow-blue-500/20">
             <Boxes className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Quản Lý Danh Mục & Bật/Tắt Sản Phẩm Hôm Nay
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
@@ -458,7 +458,7 @@ export default function ProductManager() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
           <button
             onClick={handleDownloadTemplate}
             className="inline-flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors border border-slate-200"
@@ -496,7 +496,7 @@ export default function ProductManager() {
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {/* Total Products */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
@@ -681,7 +681,8 @@ export default function ProductManager() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-600">
@@ -814,6 +815,82 @@ export default function ProductManager() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Product Cards (< md) */}
+          <div className="md:hidden divide-y divide-slate-100 p-2.5 space-y-2.5">
+            {paginationData.items.map((prod) => {
+              const isActive = Boolean(prod.is_active_today);
+              const isChecked = selectedIds.has(String(prod.id));
+
+              return (
+                <div
+                  key={prod.id}
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    isActive
+                      ? 'bg-emerald-50/40 border-emerald-300'
+                      : 'bg-white border-slate-200 shadow-xs'
+                  } ${isChecked ? 'ring-2 ring-blue-500' : ''}`}
+                >
+                  {/* Row 1: Checkbox + Product Name */}
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handleToggleSelectItem(prod.id)}
+                      className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-slate-900 leading-snug break-words">
+                        {prod.name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className="text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
+                          KH: {prod.customer || '—'}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          Đơn: <strong className="text-slate-800">{prod.order_quantity || 0}</strong> • Phôi: <strong className="text-slate-800">{prod.blank_quantity || 0}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Touch-friendly Toggle Switch & Actions */}
+                  <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleProduct(prod)}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs ${
+                        isActive
+                          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-slate-400'}`} />
+                      {isActive ? 'ĐANG BẬT HÔM NAY' : 'BẤM ĐỂ BẬT'}
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditModal(prod)}
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Sửa sản phẩm"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingProductId(prod.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Xóa sản phẩm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
 
         {/* Pagination Bar */}

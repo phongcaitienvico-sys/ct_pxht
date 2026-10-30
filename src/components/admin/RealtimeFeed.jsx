@@ -322,7 +322,7 @@ export default function RealtimeFeed() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           {/* Refresh button */}
           <button
             onClick={() => loadData(true)}
@@ -360,9 +360,9 @@ export default function RealtimeFeed() {
       </div>
 
       {/* 4 Real-time KPI Cards for Today */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Card 1: Sản lượng hôm nay */}
-        <div className="bg-white p-4 rounded-xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/30 shadow-xs">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/30 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-700">
               {dateFilter === 'today'
@@ -376,7 +376,7 @@ export default function RealtimeFeed() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-blue-900">
+            <span className="text-2xl sm:text-3xl font-extrabold text-blue-900">
               {currentKPI.totalQuantity.toLocaleString('vi-VN')}
             </span>
             <span className="text-xs font-medium text-blue-600">sản phẩm</span>
@@ -387,7 +387,7 @@ export default function RealtimeFeed() {
         </div>
 
         {/* Card 2: Tổng giờ làm */}
-        <div className="bg-white p-4 rounded-xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/30 shadow-xs">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/30 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-indigo-700">
               Tổng Giờ Làm Việc
@@ -397,7 +397,7 @@ export default function RealtimeFeed() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-indigo-900">
+            <span className="text-2xl sm:text-3xl font-extrabold text-indigo-900">
               {currentKPI.totalHours}
             </span>
             <span className="text-xs font-medium text-indigo-600">giờ</span>
@@ -408,7 +408,7 @@ export default function RealtimeFeed() {
         </div>
 
         {/* Card 3: Thợ có sản lượng */}
-        <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/30 shadow-xs">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/30 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               Công Nhân Đạt Sản Lượng
@@ -418,7 +418,7 @@ export default function RealtimeFeed() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-emerald-900">
+            <span className="text-2xl sm:text-3xl font-extrabold text-emerald-900">
               {currentKPI.activeWorkersCount}
             </span>
             <span className="text-xs font-medium text-emerald-600">thợ</span>
@@ -429,7 +429,7 @@ export default function RealtimeFeed() {
         </div>
 
         {/* Card 4: Tổ đã báo cáo */}
-        <div className="bg-white p-4 rounded-xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/30 shadow-xs">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/30 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
               Tổ Đã Nhập Dữ Liệu
@@ -439,7 +439,7 @@ export default function RealtimeFeed() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-amber-900">
+            <span className="text-2xl sm:text-3xl font-extrabold text-amber-900">
               {currentKPI.activeTeamsCount}
             </span>
             <span className="text-xs font-medium text-amber-600">
@@ -453,7 +453,7 @@ export default function RealtimeFeed() {
       </div>
 
       {/* Filter and Search Controls */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -555,7 +555,8 @@ export default function RealtimeFeed() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
@@ -685,6 +686,89 @@ export default function RealtimeFeed() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Real-time Cards (< md) */}
+          <div className="md:hidden divide-y divide-slate-100 p-2.5 space-y-2.5">
+            {filteredLogs.map((log) => {
+              const isHighlighted = recentInsertedId === log.id;
+              return (
+                <div
+                  key={log.id}
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    isHighlighted
+                      ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400 shadow-md animate-pulse'
+                      : 'bg-white border-slate-200/90 shadow-xs'
+                  }`}
+                >
+                  {/* Row 1: Time, Team & Stats */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
+                        <Clock className="w-3 h-3 mr-1 text-slate-400" />
+                        {formatLogTime(log.created_at || log.log_date)}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                        {log.team_name || (log.teams && log.teams.name) || 'Tổ SX'}
+                      </span>
+                    </div>
+                    <div className="text-right whitespace-nowrap">
+                      <span className="text-base font-extrabold text-blue-700">{log.quantity}</span>
+                      <span className="text-xs text-slate-500 font-medium ml-1">SP</span>
+                      <span className="text-xs text-slate-400 ml-1">({log.duration_hours}h)</span>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Worker & Product */}
+                  <div className="space-y-1.5 my-2">
+                    <div className="flex items-center text-sm font-semibold text-slate-900">
+                      <Users className="w-3.5 h-3.5 text-blue-600 mr-1.5 flex-shrink-0" />
+                      <span className="truncate">{log.employee_name || 'Công nhân'}</span>
+                      {log.employee_code && (
+                        <span className="ml-1.5 text-xs text-slate-500 font-mono font-normal">#{log.employee_code}</span>
+                      )}
+                    </div>
+                    <div className="flex items-start text-xs text-slate-700">
+                      <Package className="w-3.5 h-3.5 text-slate-400 mr-1.5 mt-0.5 flex-shrink-0" />
+                      <div className="leading-tight">
+                        <span className="font-medium text-slate-800">{log.product_name || `Mã #${log.product_id}`}</span>
+                        {log.customer && (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-normal">
+                            {log.customer}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Notes if any */}
+                  {log.notes && (
+                    <div className="text-xs text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 mb-2 italic">
+                      "{log.notes}"
+                    </div>
+                  )}
+
+                  {/* Row 4: Action buttons */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => handleOpenEdit(log)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Sửa
+                    </button>
+                    <button
+                      onClick={() => setDeletingLog(log)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
       </div>
 

@@ -169,7 +169,7 @@ export default function Navbar({
                   <KeyRound className="w-4 h-4 text-slate-400" />
                   Đổi mật khẩu
                 </button>
-                {isLeader && onToggleMobileFrame && (
+                {onToggleMobileFrame && (
                   <button
                     type="button"
                     role="menuitem"
@@ -258,32 +258,32 @@ export default function Navbar({
         </div>
       )}
 
-      {/* Leader bottom tab bar (<lg) */}
-      {isLeader && (
-        <nav
-          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 grid grid-cols-2"
-          aria-label="Điều hướng"
-        >
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => selectTab(tab.id)}
-                aria-current={active ? 'page' : undefined}
-                className={`flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium ${
-                  active ? 'text-blue-600' : 'text-slate-500'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      )}
+      {/* Mobile bottom tab bar (<lg) for Admin (5 tabs) and Leader (2 tabs) */}
+      <nav
+        className={`lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 shadow-lg grid ${
+          isLeader ? 'grid-cols-2' : 'grid-cols-5'
+        }`}
+        aria-label="Điều hướng"
+      >
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => selectTab(tab.id)}
+              aria-current={active ? 'page' : undefined}
+              className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-[10px] sm:text-[11px] font-medium transition-colors ${
+                active ? 'text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Icon className={`w-5 h-5 ${active ? 'text-blue-600 stroke-[2.25]' : 'text-slate-400'}`} />
+              <span className="truncate max-w-[65px] text-center leading-tight">{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </>
   );
 }
