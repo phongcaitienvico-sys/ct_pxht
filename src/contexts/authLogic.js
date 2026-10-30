@@ -29,6 +29,17 @@ export const DEMO_PROFILES = {
   }
 };
 
+// Map demo role team identifiers to database seed team UUIDs
+export const DEMO_TEAM_MAP = {
+  'team-1': 'a0000000-0000-0000-0000-000000000001',
+  'team-2': 'a0000000-0000-0000-0000-000000000002'
+};
+
+export function resolveEffectiveTeamId(teamId) {
+  if (!teamId) return null;
+  return DEMO_TEAM_MAP[teamId] || teamId;
+}
+
 const AUTH_STORAGE_KEY = 'pxht_auth_user';
 let inMemoryAuthUser = null;
 

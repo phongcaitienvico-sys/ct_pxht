@@ -36,7 +36,8 @@ import {
   filterActiveProducts,
   filterTeamEmployees,
   formatProductLabel,
-  calculateFormTotals
+  calculateFormTotals,
+  DEMO_TEAM_MAP
 } from './leaderEntryLogic.js';
 
 /**
@@ -56,7 +57,8 @@ export default function LeaderEntryForm({
   const currentTeam = auth?.currentTeam;
   const currentUser = auth?.currentUser;
 
-  const effectiveTeamId = propTeamId || currentTeam?.id || null;
+  const rawTeamId = propTeamId || currentTeam?.id || null;
+  const effectiveTeamId = DEMO_TEAM_MAP[rawTeamId] || rawTeamId;
   const effectiveUserId = propUserId || currentUser?.id || null;
 
   // Master data

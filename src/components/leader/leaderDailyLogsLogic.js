@@ -105,6 +105,11 @@ export function groupLogsByEmployee(logs = []) {
   return groups;
 }
 
+export const DEMO_TEAM_MAP = {
+  'team-1': 'a0000000-0000-0000-0000-000000000001',
+  'team-2': 'a0000000-0000-0000-0000-000000000002'
+};
+
 /**
  * Lọc danh sách bản ghi theo ngày và tổ
  * @param {Array<Object>} logs
@@ -114,6 +119,7 @@ export function groupLogsByEmployee(logs = []) {
  */
 export function filterLogsByDateAndTeam(logs = [], date = null, teamId = null) {
   if (!Array.isArray(logs)) return [];
+  const mappedTeamId = DEMO_TEAM_MAP[teamId] || teamId;
 
   return logs.filter((log) => {
     if (!log) return false;
@@ -129,7 +135,7 @@ export function filterLogsByDateAndTeam(logs = [], date = null, teamId = null) {
     // Filter by teamId if provided and not 'all'
     if (teamId && teamId !== 'all') {
       const logTeamId = log.team_id || (log.teams && log.teams.id);
-      if (logTeamId !== teamId) {
+      if (logTeamId !== teamId && logTeamId !== mappedTeamId) {
         return false;
       }
     }

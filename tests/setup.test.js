@@ -82,6 +82,11 @@ assert.ok(
   indexHtml.includes('src="/src/main.jsx"') || indexHtml.includes('src="src/main.jsx"'),
   'index.html must link to src/main.jsx as module'
 );
+assert.ok(
+  indexHtml.includes('href="./favicon.svg"'),
+  'index.html must link to ./favicon.svg'
+);
+assertFileExists('public/favicon.svg', 'Favicon static SVG asset');
 console.log('✔ index.html verification passed');
 
 // 6. src/index.css verification

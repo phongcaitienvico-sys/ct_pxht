@@ -37,7 +37,8 @@ import {
   validateEditInput,
   getEmployeeInitials,
   getQuickDate,
-  formatDateDisplay
+  formatDateDisplay,
+  DEMO_TEAM_MAP
 } from './leaderDailyLogsLogic.js';
 
 /**
@@ -56,7 +57,8 @@ export default function LeaderDailyLogs({
   const currentTeam = auth?.currentTeam;
   const currentUser = auth?.currentUser;
 
-  const effectiveTeamId = propTeamId || currentTeam?.id || null;
+  const rawTeamId = propTeamId || currentTeam?.id || null;
+  const effectiveTeamId = DEMO_TEAM_MAP[rawTeamId] || rawTeamId;
   const effectiveUserId = propUserId || currentUser?.id || null;
 
   // Selected Date state (defaults to today)

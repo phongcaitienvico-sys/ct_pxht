@@ -14,7 +14,8 @@ import {
   isDemoMode
 } from '../src/lib/supabase.js';
 
-import { filterActiveProducts } from '../src/components/leader/leaderEntryLogic.js';
+import { filterActiveProducts, filterTeamEmployees } from '../src/components/leader/leaderEntryLogic.js';
+import { switchDemoRoleLogic, DEMO_TEAM_MAP } from '../src/contexts/authLogic.js';
 import { calculateTodayKPI } from '../src/components/admin/realtimeFeedLogic.js';
 import {
   filterLogsByCriteria,
@@ -170,6 +171,43 @@ async function runE2ETests() {
   assert.ok(summaryJson.length >= 1, 'Summary sheet should have employee summary rows');
   console.log('  ✔ Step 6: Excel dual-sheet report generation verified successfully');
 
+  // Step 7: Chuyển đổi sang Tổ Trưởng 1 & Kiểm tra danh sách thợ trong tổ mà không cần bật "Xem thợ tổ khác"
+  const leader1Session = switchDemoRoleLogic('leader1');
+  assert.strictEqual(leader1Session.role, 'leader', 'Switching to leader1 must set role to leader');
+  assert.strictEqual(leader1Session.user.teamId, 'team-1', 'Leader1 profile has teamId team-1');
+
+  // Kiểm tra DEMO_TEAM_MAP ánh xạ chính xác 'team-1' sang UUID hạt giống
+  const effectiveTeamId = DEMO_TEAM_MAP[leader1Session.user.teamId] || leader1Session.user.teamId;
+  assert.strictEqual(
+    effectiveTeamId,
+    'a0000000-0000-0000-0000-000000000001',
+    'Effective teamId passed to LeaderEntryForm must match seed UUID a0000000-0000-0000-0000-000000000001'
+  );
+
+  // Lấy toàn bộ nhân viên và lọc theo effectiveTeamId với includeOtherTeams = false
+  const allEmployeesList = await getEmployees();
+  const leader1TeamWorkers = filterTeamEmployees(allEmployeesList, effectiveTeamId, false);
+  assert.strictEqual(
+    leader1TeamWorkers.length,
+    3,
+    'Tổ Trưởng 1 phải nhìn thấy đúng 3 thợ của tổ mình mà không cần bật "Xem thợ tổ khác"'
+  );
+
+  const workerNames = leader1TeamWorkers.map((w) => w.full_name || w.name);
+  assert.ok(
+    workerNames.includes('Trần Văn Hùng'),
+    'Danh sách thợ của Tổ 1 phải có Trần Văn Hùng'
+  );
+  assert.ok(
+    workerNames.includes('Lê Văn Cường'),
+    'Danh sách thợ của Tổ 1 phải có Lê Văn Cường'
+  );
+  assert.ok(
+    workerNames.includes('Nguyễn Đình Tú'),
+    'Danh sách thợ của Tổ 1 phải có Nguyễn Đình Tú'
+  );
+  console.log('  ✔ Step 7: Demo role Tổ Trưởng 1 shows preloaded workers (Trần Văn Hùng, Lê Văn Cường, Nguyễn Đình Tú) in their team without needing to check "Xem thợ tổ khác"');
+
   // =========================================================================
   // SECTION 2: APPLICATION SHELL & COMPONENT VERIFICATION
   // =========================================================================
@@ -217,7 +255,25 @@ async function runE2ETests() {
   assert.ok(appContent.includes('LeaderEntryForm'), 'App.jsx must import LeaderEntryForm');
   assert.ok(appContent.includes('LeaderDailyLogs'), 'App.jsx must import LeaderDailyLogs');
   assert.ok(appContent.includes('LoginModal'), 'App.jsx must support LoginModal');
+  assert.ok(appContent.includes('DEMO_TEAM_MAP'), 'App.jsx must declare DEMO_TEAM_MAP');
+  assert.ok(
+    appContent.includes('teamId={effectiveTeamId}'),
+    'App.jsx must pass effectiveTeamId to LeaderEntryForm and LeaderDailyLogs'
+  );
   console.log('  ✔ App.jsx orchestrates all sub-modules for Admin and Leader');
+
+  // 3. Verify static assets & favicon
+  const indexHtmlContent = assertFileExists('index.html', 'index.html entry point');
+  assert.ok(
+    indexHtmlContent.includes('href="./favicon.svg"'),
+    'index.html must reference ./favicon.svg'
+  );
+  const faviconSvgContent = assertFileExists('public/favicon.svg', 'Static favicon SVG asset');
+  assert.ok(
+    faviconSvgContent.includes('<svg') && faviconSvgContent.includes('</svg>'),
+    'public/favicon.svg must be a valid SVG document'
+  );
+  console.log('  ✔ Static favicon.svg asset created and referenced in index.html');
 
   // 3. Verify GitHub Actions Pages workflow
   const workflowContent = assertFileExists(

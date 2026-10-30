@@ -34,7 +34,7 @@ export const seedEmployees = [
   {
     id: 'e0000000-0000-0000-0000-000000000003',
     code: 'NV03',
-    full_name: 'Nguyễn Văn Thắng',
+    full_name: 'Nguyễn Đình Tú',
     team_id: 'a0000000-0000-0000-0000-000000000001',
     is_active: true
   },

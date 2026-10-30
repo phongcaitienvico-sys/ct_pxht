@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   DEMO_PROFILES,
+  DEMO_TEAM_MAP,
   resolveUserRole,
   resolveUserTeam,
   switchDemoRoleLogic,
@@ -10,7 +11,7 @@ import {
   clearAuthSession
 } from './authLogic.js';
 
-export { DEMO_PROFILES, resolveUserRole, resolveUserTeam };
+export { DEMO_PROFILES, DEMO_TEAM_MAP, resolveUserRole, resolveUserTeam };
 
 export const AuthContext = createContext(null);
 

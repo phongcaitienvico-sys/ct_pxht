@@ -147,7 +147,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO employees (code, full_name, team_id, is_active) VALUES
   ('NV01', 'Trần Văn Hùng', 'a0000000-0000-0000-0000-000000000001', true),
   ('NV02', 'Lê Văn Cường', 'a0000000-0000-0000-0000-000000000001', true),
-  ('NV03', 'Nguyễn Văn Thắng', 'a0000000-0000-0000-0000-000000000001', true),
+  ('NV03', 'Nguyễn Đình Tú', 'a0000000-0000-0000-0000-000000000001', true),
   ('NV04', 'Phạm Văn Minh', 'a0000000-0000-0000-0000-000000000002', true),
   ('NV05', 'Hoàng Đức Tuấn', 'a0000000-0000-0000-0000-000000000002', true),
   ('NV06', 'Đỗ Quốc Việt', 'a0000000-0000-0000-0000-000000000002', true)

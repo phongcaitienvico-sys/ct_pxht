@@ -10,6 +10,11 @@ import LeaderEntryForm from './components/leader/LeaderEntryForm.jsx';
 import LeaderDailyLogs from './components/leader/LeaderDailyLogs.jsx';
 import { Smartphone, Monitor } from 'lucide-react';
 
+export const DEMO_TEAM_MAP = {
+  'team-1': 'a0000000-0000-0000-0000-000000000001',
+  'team-2': 'a0000000-0000-0000-0000-000000000002'
+};
+
 function MainAppShell() {
   const { currentUser, role, currentTeam, loading } = useAuth();
   const [activeTab, setActiveTab] = useState(role === 'admin' ? 'realtime' : 'entry');
@@ -39,9 +44,10 @@ function MainAppShell() {
   }
 
   // Team parameters for leader forms
+  const rawTeamId = currentTeam?.id || currentUser?.teamId;
   const effectiveTeamId =
-    currentTeam?.id ||
-    currentUser?.teamId ||
+    DEMO_TEAM_MAP[rawTeamId] ||
+    rawTeamId ||
     'a0000000-0000-0000-0000-000000000001';
   const effectiveTeamName =
     currentTeam?.name ||

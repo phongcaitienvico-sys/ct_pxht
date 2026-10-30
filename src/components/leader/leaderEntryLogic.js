@@ -18,6 +18,11 @@ export function createEmptyRow() {
   };
 }
 
+export const DEMO_TEAM_MAP = {
+  'team-1': 'a0000000-0000-0000-0000-000000000001',
+  'team-2': 'a0000000-0000-0000-0000-000000000002'
+};
+
 /**
  * Lọc các sản phẩm đang được Quản đốc kích hoạt sản xuất hôm nay (is_active_today = true)
  * @param {Array<Object>} products
@@ -37,11 +42,12 @@ export function filterActiveProducts(products = []) {
  */
 export function filterTeamEmployees(employees = [], teamId = null, includeOtherTeams = false) {
   if (!Array.isArray(employees)) return [];
+  const mappedTeamId = DEMO_TEAM_MAP[teamId] || teamId;
   return employees.filter((emp) => {
     if (!emp || emp.is_active === false) return false;
     if (includeOtherTeams) return true;
     if (!teamId) return true;
-    return emp.team_id === teamId;
+    return emp.team_id === teamId || emp.team_id === mappedTeamId;
   });
 }
 
