@@ -948,6 +948,29 @@ export default function EmployeeManager() {
 
             {/* Content */}
             <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              {/* Template Download Banner */}
+              <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-emerald-950">Chưa có file mẫu nhân sự?</h4>
+                    <p className="text-xs text-emerald-800/80 mt-0.5">
+                      Tải file mẫu chuẩn (.xlsx) có sẵn cột: <strong>Mã NV</strong>, <strong>Họ và tên</strong>, <strong>Tổ / Bộ phận</strong>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-all shrink-0 hover:shadow"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải File Mẫu (.xlsx)</span>
+                </button>
+              </div>
+
               {/* File Dropzone */}
               <div
                 onClick={() => fileInputRef.current?.click()}

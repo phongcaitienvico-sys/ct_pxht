@@ -1110,17 +1110,27 @@ export default function ProductManager() {
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto">
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 flex items-start space-x-2">
-                <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-semibold">Định dạng hỗ trợ:</span> File .xlsx hoặc .xlsm. Cột dữ liệu hỗ trợ tiêu đề tiếng Việt: <strong>Mã SP</strong>, <strong>Tên sản phẩm</strong>, <strong>Khách hàng</strong>, <strong>Số lượng</strong>, <strong>Phôi</strong>, <strong>T.t</strong>.
-                  <button
-                    onClick={handleDownloadTemplate}
-                    className="ml-2 text-blue-700 underline font-semibold hover:text-blue-900"
-                  >
-                    Tải file mẫu tại đây
-                  </button>
+              {/* Download Template Banner */}
+              <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-indigo-950">Chưa có file mẫu Excel?</h4>
+                    <p className="text-xs text-indigo-800/80 mt-0.5">
+                      Tải file mẫu chuẩn (.xlsx) có sẵn cột: <strong>Mã SP</strong>, <strong>Tên sản phẩm</strong>, <strong>Khách hàng</strong>, <strong>Số lượng</strong>, <strong>Phôi</strong>, <strong>T.t</strong>
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all shrink-0 hover:shadow"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải File Mẫu (.xlsx)</span>
+                </button>
               </div>
 
               {/* File Dropzone */}
@@ -1188,14 +1198,23 @@ export default function ProductManager() {
             </div>
 
             {/* Modal Actions */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setIsImportModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-200 transition-colors"
+                onClick={handleDownloadTemplate}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition-colors"
               >
-                Đóng
+                <Download className="w-4 h-4" />
+                <span>Tải file Excel mẫu</span>
               </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  Đóng
+                </button>
               <button
                 type="button"
                 disabled={parsedPreview.length === 0 || isImporting}
@@ -1207,6 +1226,7 @@ export default function ProductManager() {
               </button>
             </div>
           </div>
+        </div>
         </div>
       )}
 
