@@ -380,6 +380,30 @@ export async function upsertEmployees(employeesArray) {
   return data;
 }
 
+/**
+ * Xóa một nhân viên khỏi danh sách
+ */
+export async function deleteEmployee(id) {
+  if (isDemoMode()) {
+    await ensureDemoInitialized();
+    const emps = getStore(KEYS.EMPLOYEES, []);
+    const filtered = emps.filter((e) => String(e.id) !== String(id) && String(e.code) !== String(id));
+    setStore(KEYS.EMPLOYEES, filtered);
+    return true;
+  }
+
+  const { error } = await supabase
+    .from('employees')
+    .delete()
+    .eq('id', String(id));
+
+  if (error) {
+    console.error('deleteEmployee error:', error);
+    throw error;
+  }
+  return true;
+}
+
 // ==============================================================================
 // PRODUCTION LOGS APIS
 // ==============================================================================
@@ -690,6 +714,7 @@ export default {
   getTeams,
   getEmployees,
   upsertEmployees,
+  deleteEmployee,
   submitProductionLogs,
   getProductionLogs,
   updateProductionLog,
