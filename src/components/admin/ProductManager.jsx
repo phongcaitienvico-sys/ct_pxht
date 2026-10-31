@@ -48,6 +48,54 @@ import {
   generateProductTemplate
 } from '../../lib/excel.js';
 
+const MAX_OPERATIONS = 10;
+
+/** Parse "a, b" hoặc nhiều dòng -> ['a','b'] (trim, bỏ trùng/rỗng, tối đa 10) */
+function parseOperationsText(text) {
+  const seen = new Set();
+  const result = [];
+  String(text || '')
+    .split(/[,;\r\n]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .forEach((x) => {
+      const key = x.toLowerCase();
+      if (!seen.has(key) && result.length < MAX_OPERATIONS) {
+        seen.add(key);
+        result.push(x);
+      }
+    });
+  return result;
+}
+
+/** Hiển thị các công đoạn dạng chip nhỏ (tối đa 5 chip, phần còn lại +n) */
+function OperationChips({ operations, max = 5 }) {
+  const list = Array.isArray(operations) ? operations.filter(Boolean) : [];
+  if (list.length === 0) return null;
+  const shown = list.slice(0, max);
+  const extra = list.length - shown.length;
+  return (
+    <div className="flex flex-wrap items-center gap-1 mt-1">
+      {shown.map((op, i) => (
+        <span
+          key={`${op}-${i}`}
+          className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-200"
+        >
+          {op}
+        </span>
+      ))}
+      {extra > 0 && (
+        <span
+          className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600"
+          title={list.slice(max).join(', ')}
+        >
+          +{extra}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function ProductManager() {
   // Products state
   const [products, setProducts] = useState([]);
@@ -77,7 +125,8 @@ export default function ProductManager() {
     order_quantity: 0,
     blank_quantity: 0,
     status: 'Sx',
-    is_active_today: false
+    is_active_today: false,
+    operationsText: ''
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -279,7 +328,8 @@ export default function ProductManager() {
       order_quantity: 0,
       blank_quantity: 0,
       status: 'Sx',
-      is_active_today: false
+      is_active_today: false,
+      operationsText: ''
     });
     setFormErrors({});
     setIsFormModalOpen(true);
@@ -294,7 +344,8 @@ export default function ProductManager() {
       order_quantity: product.order_quantity || 0,
       blank_quantity: product.blank_quantity || 0,
       status: product.status || 'Sx',
-      is_active_today: Boolean(product.is_active_today)
+      is_active_today: Boolean(product.is_active_today),
+      operationsText: Array.isArray(product.operations) ? product.operations.join(', ') : ''
     });
     setFormErrors({});
     setIsFormModalOpen(true);
@@ -311,7 +362,9 @@ export default function ProductManager() {
 
     setIsSubmitting(true);
     try {
-      await upsertProducts([validation.sanitized]);
+      await upsertProducts([
+        { ...validation.sanitized, operations: parseOperationsText(formData.operationsText) }
+      ]);
       showToast('success', editingProduct ? 'Đã cập nhật sản phẩm thành công' : 'Đã thêm sản phẩm mới thành công');
       setIsFormModalOpen(false);
       await loadProducts(false);
@@ -761,6 +814,7 @@ export default function ProductManager() {
                       {/* Name */}
                       <td className="py-3.5 px-3">
                         <div className="font-semibold text-slate-900">{prod.name}</div>
+                        <OperationChips operations={prod.operations} />
                       </td>
 
                       {/* Customer */}
@@ -851,6 +905,7 @@ export default function ProductManager() {
                           Đơn: <strong className="text-slate-800">{prod.order_quantity || 0}</strong> • Phôi: <strong className="text-slate-800">{prod.blank_quantity || 0}</strong>
                         </span>
                       </div>
+                      <OperationChips operations={prod.operations} />
                     </div>
                   </div>
 
@@ -1052,6 +1107,23 @@ export default function ProductManager() {
                 </div>
               </div>
 
+              {/* Operations */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Công Đoạn <span className="font-normal text-slate-400">(tùy chọn)</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={formData.operationsText}
+                  onChange={(e) => setFormData({ ...formData, operationsText: e.target.value })}
+                  placeholder="Cách nhau bằng dấu phẩy hoặc xuống dòng, ví dụ: Cắt, Hàn, Sơn (tối đa 10)"
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {parseOperationsText(formData.operationsText).length}/{MAX_OPERATIONS} công đoạn
+                </p>
+              </div>
+
               {/* Active Today Row */}
               <div className="pt-1">
                 <div className="flex flex-col justify-end">
@@ -1121,6 +1193,9 @@ export default function ProductManager() {
                     <p className="text-xs text-indigo-800/80 mt-0.5">
                       Tải file mẫu chuẩn (.xlsx) có sẵn cột: <strong>Mã SP</strong>, <strong>Tên sản phẩm</strong>, <strong>Khách hàng</strong>, <strong>Số lượng</strong>, <strong>Phôi</strong>, <strong>T.t</strong>
                     </p>
+                    <p className="text-xs text-indigo-800/80 mt-1">
+                      Có thể thêm các cột <strong>CD1</strong> ... <strong>CD10</strong> (tên công đoạn) sau các cột sản phẩm.
+                    </p>
                   </div>
                 </div>
                 <button
@@ -1149,7 +1224,7 @@ export default function ProductManager() {
                 <p className="text-sm font-semibold text-slate-800">
                   {importFile ? importFile.name : 'Nhấp vào đây để chọn file Excel hoặc kéo thả file'}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">Hỗ trợ các định dạng .xlsx, .xlsm (tối đa 10MB)</p>
+                <p className="text-xs text-slate-400 mt-1">Hỗ trợ các định dạng .xlsx, .xlsm (tối đa 10MB). File có thể chứa thêm các cột CD1..CD10 (tên công đoạn) sau các cột sản phẩm.</p>
               </div>
 
               {/* Error Alert */}
@@ -1178,6 +1253,7 @@ export default function ProductManager() {
                           <th className="py-2 px-3">Khách hàng</th>
                           <th className="py-2 px-3 text-right">SL Đơn</th>
                           <th className="py-2 px-3 text-right">SL Phôi</th>
+                          <th className="py-2 px-3">Công đoạn</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1188,6 +1264,16 @@ export default function ProductManager() {
                             <td className="py-1.5 px-3 text-slate-600">{row.customer || '—'}</td>
                             <td className="py-1.5 px-3 text-right">{row.order_quantity}</td>
                             <td className="py-1.5 px-3 text-right">{row.blank_quantity}</td>
+                            <td className="py-1.5 px-3">
+                              {Array.isArray(row.operations) && row.operations.length > 0 ? (
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <span className="font-semibold text-violet-700">{row.operations.length}</span>
+                                  <OperationChips operations={row.operations} max={3} />
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

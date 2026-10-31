@@ -5,6 +5,7 @@ import {
   calculateAnalyticsKPI,
   groupLogsByDay,
   groupLogsByEmployeeSummary,
+  groupLogsByOperation,
   formatDateVN,
   formatNumber
 } from '../src/components/admin/reportAnalyticsLogic.js';
@@ -420,6 +421,31 @@ runTest('handles logs with missing or partial employee info in summary', () => {
   assert.strictEqual(summaries[0].employeeName, 'Nhân Viên Khác');
   assert.strictEqual(summaries[0].totalQuantity, 5);
   assert.strictEqual(summaries[0].totalHours, 4);
+});
+
+runTest('groupLogsByOperation groups, sums and sorts by quantity desc', () => {
+  const logs = [
+    { operation: 'Sơn', quantity: 5, duration_hours: 2 },
+    { operation: 'Mài đậu', quantity: 20, duration_hours: 3.5 },
+    { operation: 'Sơn', quantity: 7, duration_hours: 1.5 },
+    { operation: '', quantity: 1, duration_hours: 1 },
+    { quantity: 2, duration_hours: 0.5 }
+  ];
+  const groups = groupLogsByOperation(logs);
+  assert.deepStrictEqual(groups.map((g) => g.operation), ['Mài đậu', 'Sơn', '(Chưa chọn công đoạn)']);
+  assert.deepStrictEqual(groups[0], { operation: 'Mài đậu', totalQuantity: 20, totalHours: 3.5, count: 1 });
+  assert.deepStrictEqual(groups[1], { operation: 'Sơn', totalQuantity: 12, totalHours: 3.5, count: 2 });
+  assert.deepStrictEqual(groups[2], { operation: '(Chưa chọn công đoạn)', totalQuantity: 3, totalHours: 1.5, count: 2 });
+  assert.deepStrictEqual(groupLogsByOperation([]), []);
+  assert.deepStrictEqual(groupLogsByOperation(null), []);
+});
+
+runTest('filterLogsByCriteria search matches operation', () => {
+  const logs = [
+    { log_date: '2026-10-30', operation: 'Đóng thùng', quantity: 1 },
+    { log_date: '2026-10-30', operation: 'Sơn', quantity: 1 }
+  ];
+  assert.strictEqual(filterLogsByCriteria(logs, { search: 'thùng' }).length, 1);
 });
 
 console.log(`\n========================================`);

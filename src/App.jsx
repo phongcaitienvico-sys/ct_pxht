@@ -18,7 +18,7 @@ const ADMIN_TAB_IDS = ['products', 'realtime', 'reports', 'employees', 'accounts
 const LEADER_TAB_IDS = ['entry', 'logs'];
 
 function MainAppShell() {
-  const { currentUser, role, currentTeam, loading } = useAuth();
+  const { currentUser, role, loading } = useAuth();
   const [activeTab, setActiveTab] = useState(role === 'admin' ? 'realtime' : 'entry');
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isMobileFrame, setIsMobileFrame] = useState(false);
@@ -46,35 +46,20 @@ function MainAppShell() {
     return <LoginModal />;
   }
 
-  // Team parameters for leader forms
-  const rawTeamId = currentTeam?.id || currentUser?.teamId;
-  const effectiveTeamId = DEMO_TEAM_MAP[rawTeamId] || rawTeamId || null;
-  const effectiveTeamName = currentTeam?.name || currentUser?.teamName || '';
   const effectiveUserId = currentUser?.id;
 
   const renderLeader = (tab) => {
-    if (!effectiveTeamId) {
-      return (
-        <div className="p-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl">
-          Tài khoản này chưa được gán tổ. Vui lòng liên hệ quản trị viên.
-        </div>
-      );
-    }
     if (tab === 'logs') {
       return (
         <LeaderDailyLogs
-          teamId={effectiveTeamId}
           userId={effectiveUserId}
-          teamName={effectiveTeamName}
           onNavigateToEntry={() => setActiveTab('entry')}
         />
       );
     }
     return (
       <LeaderEntryForm
-        teamId={effectiveTeamId}
         userId={effectiveUserId}
-        teamName={effectiveTeamName}
         onSuccess={() => setActiveTab('logs')}
       />
     );

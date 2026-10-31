@@ -71,6 +71,18 @@ async function runTests() {
   assert.strictEqual(fetchedNew.name, 'Búa nghiền mẫu test');
   console.log('✔ upsertProducts passed');
 
+  // 5b. Công đoạn của sản phẩm
+  const seedList = await getProducts();
+  assert.ok(seedList.every((p) => Array.isArray(p.operations)), 'getProducts always returns operations array');
+  assert.deepStrictEqual(fetchedNew.operations, [], 'Product without operations => []');
+  await upsertProducts([{ ...newProduct, operations: [' Mài đậu ', '', 'Sơn'] }]);
+  assert.deepStrictEqual((await getProducts()).find(p => p.id === '9999').operations, ['Mài đậu', 'Sơn'], 'operations trimmed, empties dropped');
+  await upsertProducts([{ ...newProduct, name: 'Đổi tên' }]);
+  assert.deepStrictEqual((await getProducts()).find(p => p.id === '9999').operations, ['Mài đậu', 'Sơn'], 'undefined operations keeps existing');
+  await upsertProducts([{ ...newProduct, operations: Array.from({ length: 12 }, (_, i) => 'CD' + (i + 1)) }]);
+  assert.strictEqual((await getProducts()).find(p => p.id === '9999').operations.length, 10, 'max 10 operations');
+  console.log('✔ product operations passed');
+
   // 6. Teams & Employees
   const teams = await getTeams();
   assert.ok(Array.isArray(teams) && teams.length >= 2, 'getTeams should return at least 2 teams');
@@ -155,6 +167,19 @@ async function runTests() {
   const remainingLogs = await getProductionLogs({ date: testDate });
   assert.ok(!remainingLogs.some(l => l.id === logToDelete.id), 'Deleted log should not exist in logs');
   console.log('✔ submitProductionLogs, getProductionLogs, updateProductionLog, deleteProductionLog passed');
+
+  // Công đoạn trong nhật ký
+  const [opLog] = await submitProductionLogs([
+    { employee_id: team1Employees[0].id, product_id: '9999', quantity: 1, duration_hours: 1, operation: ' Sơn ' }
+  ]);
+  assert.strictEqual(opLog.operation, 'Sơn');
+  const updatedOp = await updateProductionLog(opLog.id, { operation: 'Nắn' });
+  assert.strictEqual(updatedOp.operation, 'Nắn');
+  const [noOpLog] = await submitProductionLogs([
+    { employee_id: team1Employees[0].id, product_id: '9999', quantity: 1, duration_hours: 1 }
+  ]);
+  assert.strictEqual(noOpLog.operation, '');
+  console.log('✔ production log operation passed');
 
   unsubscribe();
   console.log('\nAll Supabase client adapter tests passed successfully!');

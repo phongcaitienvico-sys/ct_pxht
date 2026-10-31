@@ -44,6 +44,7 @@ console.log('--- Test Suite 1: createEmptyRow ---');
   assert.strictEqual(row1.quantity, '', 'Initial quantity must be empty string');
   assert.strictEqual(row1.duration_hours, '', 'Initial duration_hours must be empty string');
   assert.strictEqual(row1.notes, '', 'Initial notes must be empty string');
+  assert.strictEqual(row1.operation, '', 'Initial operation must be empty string');
 
   console.log('✔ createEmptyRow passed');
 }
@@ -74,11 +75,11 @@ console.log('\n--- Test Suite 2: filterActiveProducts ---');
 // ==========================================
 console.log('\n--- Test Suite 3: filterTeamEmployees ---');
 {
-  // Filter only current team employees (team-1)
+  // Không còn phân tổ: luôn trả về mọi nhân viên đang hoạt động
   const team1Employees = filterTeamEmployees(mockEmployees, 'team-1', false);
-  assert.strictEqual(team1Employees.length, 2, 'Should only include active employees of team-1');
-  assert.ok(team1Employees.every(e => e.team_id === 'team-1'), 'All employees must belong to team-1');
+  assert.strictEqual(team1Employees.length, 4, 'Should include all active employees regardless of team');
   assert.ok(team1Employees.every(e => e.is_active !== false), 'Must exclude inactive employees');
+  assert.strictEqual(filterTeamEmployees(mockEmployees).length, 4, 'No team arg => all active employees');
 
   // Filter with includeOtherTeams = true (borrow workers from other teams)
   const allTeamEmployees = filterTeamEmployees(mockEmployees, 'team-1', true);
@@ -166,6 +167,47 @@ console.log('\n--- Test Suite 4: validateEntryForm ---');
     'errorMessages must mention duplicate product'
   );
 
+  // 4.5b Cùng sản phẩm nhưng khác công đoạn thì hợp lệ; trùng cả công đoạn thì không
+  const opProducts = [
+    { id: '1732', name: 'A', operations: ['Mài đậu', 'Sơn'] },
+    { id: '1775', name: 'B', operations: [] }
+  ];
+  const sameProdDiffOp = validateEntryForm({
+    employee_id: 'emp-1',
+    rows: [
+      { id: '1', product_id: '1732', operation: 'Mài đậu', quantity: 5, duration_hours: 3 },
+      { id: '2', product_id: '1732', operation: 'Sơn', quantity: 2, duration_hours: 2 }
+    ]
+  }, opProducts);
+  assert.strictEqual(sameProdDiffOp.isValid, true, 'Same product with different operations is allowed');
+  const sameProdSameOp = validateEntryForm({
+    employee_id: 'emp-1',
+    rows: [
+      { id: '1', product_id: '1732', operation: 'Sơn', quantity: 5, duration_hours: 3 },
+      { id: '2', product_id: '1732', operation: 'Sơn', quantity: 2, duration_hours: 2 }
+    ]
+  }, opProducts);
+  assert.strictEqual(sameProdSameOp.isValid, false, 'Same product + same operation is a duplicate');
+  assert.ok(sameProdSameOp.errors.duplicateProductIds.includes('1732'));
+
+  // 4.5c Sản phẩm có công đoạn thì bắt buộc chọn
+  const missingOp = validateEntryForm({
+    employee_id: 'emp-1',
+    rows: [{ id: '1', product_id: '1732', operation: '', quantity: 5, duration_hours: 3 }]
+  }, opProducts);
+  assert.strictEqual(missingOp.isValid, false);
+  assert.strictEqual(missingOp.errors.rows[0].operation, 'Vui lòng chọn công đoạn');
+  const noOpNeeded = validateEntryForm({
+    employee_id: 'emp-1',
+    rows: [{ id: '1', product_id: '1775', quantity: 5, duration_hours: 3 }]
+  }, opProducts);
+  assert.strictEqual(noOpNeeded.isValid, true, 'Product without operations needs no operation');
+  const noProductsArg = validateEntryForm({
+    employee_id: 'emp-1',
+    rows: [{ id: '1', product_id: '1732', quantity: 5, duration_hours: 3 }]
+  });
+  assert.strictEqual(noProductsArg.isValid, true, 'Without product list operation is not enforced');
+
   // 4.6 Empty rows list
   const emptyRowsForm = {
     employee_id: 'emp-1',
@@ -200,7 +242,7 @@ console.log('\n--- Test Suite 5: buildBatchPayload ---');
     employee_id: 'emp-1',
     log_date: '2026-10-30',
     rows: [
-      { id: '1', product_id: '1732', quantity: '5', duration_hours: '3.5', notes: 'Gia công tiện ' },
+      { id: '1', product_id: '1732', operation: ' Sơn ', quantity: '5', duration_hours: '3.5', notes: 'Gia công tiện ' },
       { id: '2', product_id: '1775', quantity: 10, duration_hours: 4, notes: '' }
     ]
   };
@@ -221,6 +263,7 @@ console.log('\n--- Test Suite 5: buildBatchPayload ---');
   assert.strictEqual(item1.quantity, 5, 'Quantity must be parsed to Number');
   assert.strictEqual(item1.duration_hours, 3.5, 'Duration must be parsed to Number');
   assert.strictEqual(item1.notes, 'Gia công tiện', 'Notes must be trimmed');
+  assert.strictEqual(item1.operation, 'Sơn', 'Operation must be trimmed');
 
   const item2 = payload[1];
   assert.strictEqual(item2.employee_id, 'emp-1');
@@ -228,6 +271,7 @@ console.log('\n--- Test Suite 5: buildBatchPayload ---');
   assert.strictEqual(item2.quantity, 10);
   assert.strictEqual(item2.duration_hours, 4);
   assert.strictEqual(item2.notes, '');
+  assert.strictEqual(item2.operation, '', 'Missing operation => empty string');
 
   // Default date fallback
   const noDatePayload = buildBatchPayload({

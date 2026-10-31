@@ -162,8 +162,9 @@ export function filterLogsByCriteria(logs, filters = {}) {
       const empCode = log.employee_code || (log.employees && log.employees.code) || '';
       const notes = log.notes || '';
       const teamName = log.team_name || (log.teams && log.teams.name) || '';
+      const operation = log.operation || '';
 
-      const fullHaystack = `${prodName} ${prodId} ${customer} ${empName} ${empCode} ${notes} ${teamName}`.toLowerCase();
+      const fullHaystack = `${prodName} ${prodId} ${customer} ${empName} ${empCode} ${notes} ${teamName} ${operation}`.toLowerCase();
       if (!fullHaystack.includes(searchKeyword)) {
         return false;
       }
@@ -411,6 +412,42 @@ export function groupLogsByEmployeeSummary(logs) {
   return summaries;
 }
 
+export const NO_OPERATION_LABEL = '(Chưa chọn công đoạn)';
+
+/**
+ * Nhóm nhật ký theo công đoạn (sắp xếp theo sản lượng giảm dần)
+ * @param {Array<Object>} logs
+ * @returns {Array<{ operation: string, totalQuantity: number, totalHours: number, count: number }>}
+ */
+export function groupLogsByOperation(logs) {
+  if (!Array.isArray(logs) || logs.length === 0) {
+    return [];
+  }
+
+  const mapByOp = new Map();
+
+  for (const log of logs) {
+    if (!log) continue;
+    const label = String(log.operation ?? '').trim() || NO_OPERATION_LABEL;
+
+    let group = mapByOp.get(label);
+    if (!group) {
+      group = { operation: label, totalQuantity: 0, totalHours: 0, count: 0 };
+      mapByOp.set(label, group);
+    }
+    group.totalQuantity += Number(log.quantity) || 0;
+    group.totalHours += Number(log.duration_hours) || 0;
+    group.count += 1;
+  }
+
+  const result = Array.from(mapByOp.values()).map((g) => ({
+    ...g,
+    totalHours: Math.round(g.totalHours * 100) / 100
+  }));
+  result.sort((a, b) => b.totalQuantity - a.totalQuantity || a.operation.localeCompare(b.operation));
+  return result;
+}
+
 /**
  * Định dạng ngày Việt Nam: DD/MM/YYYY
  * @param {string} dateStr 'YYYY-MM-DD'
@@ -474,6 +511,7 @@ export default {
   calculateAnalyticsKPI,
   groupLogsByDay,
   groupLogsByEmployeeSummary,
+  groupLogsByOperation,
   formatDateVN,
   formatFullDateVN,
   formatNumber

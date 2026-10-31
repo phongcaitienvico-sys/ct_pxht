@@ -28,7 +28,7 @@ const ADMIN_TABS = [
 
 const LEADER_TABS = [
   { id: 'entry', label: 'Nhập Sản Lượng', icon: PenLine },
-  { id: 'logs', label: 'Lịch Sử Của Tổ', icon: FileText }
+  { id: 'logs', label: 'Lịch Sử Nhập Liệu', icon: FileText }
 ];
 
 export function getInitials(name) {
@@ -53,7 +53,7 @@ export default function Navbar({
   const demoActive = isDemoMode();
   const tabs = role === 'admin' ? ADMIN_TABS : LEADER_TABS;
   const displayName = currentUser?.name || currentUser?.full_name || currentUser?.username || 'Người dùng';
-  const roleText = role === 'admin' ? 'Quản trị' : currentTeam?.name || 'Tổ trưởng';
+  const roleText = role === 'admin' ? 'Quản trị' : 'Nhập liệu';
 
   useEffect(() => {
     if (!menuOpen) return undefined;

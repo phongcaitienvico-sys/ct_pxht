@@ -109,6 +109,48 @@ async function runExcelTests() {
   assert.strictEqual(parsedFromAB.length, 2, 'Should handle ArrayBuffer input');
   console.log('✔ parseProductExcel ArrayBuffer/Uint8Array compatibility passed');
 
+  // 2.4 Công đoạn (CD1..CD10) theo file mẫu thực tế
+  const opRows = [
+    {
+      'Id đơn hàng': 'A100',
+      'Tên sản phẩm': 'Cánh búa 395',
+      'Khách hàng': 'Đại Phú',
+      'Mác thép': 'C45',
+      'Số lượng': 10,
+      'Tỉ lệ 1': 1,
+      'CD1': 'Mài đậu',
+      'CD2': ' Hoàn thiện ',
+      'CD3': 'Nắn',
+      'CD4': 'Sơn',
+      'CD5': 'Đóng thùng',
+      'CD6': ''
+    },
+    {
+      'Id đơn hàng': 'A101',
+      'Tên sản phẩm': 'Không có công đoạn',
+      'Khách hàng': 'Đại Phú',
+      'Số lượng': 1,
+      'CD1': '',
+      'CD2': ''
+    },
+    {
+      'idsanpham': 'A102',
+      'Tên sản phẩm': 'Cột CongDoan',
+      'CongDoan2': 'B',
+      'CongDoan1': 'A',
+      'CD10': 'J'
+    }
+  ];
+  const parsedOps = parseProductExcel(createExcelBuffer('Ops', opRows));
+  assert.strictEqual(parsedOps.length, 3);
+  assert.strictEqual(parsedOps[0].id, 'A100', 'Id đơn hàng is an id alias');
+  assert.deepStrictEqual(parsedOps[0].operations, ['Mài đậu', 'Hoàn thiện', 'Nắn', 'Sơn', 'Đóng thùng']);
+  assert.deepStrictEqual(parsedOps[1].operations, [], 'No CD cells => []');
+  assert.strictEqual(parsedOps[2].id, 'A102', 'idsanpham is an id alias');
+  assert.deepStrictEqual(parsedOps[2].operations, ['A', 'B', 'J'], 'CongDoanN ordered by index');
+  assert.deepStrictEqual(parsedVn[0].operations, [], 'Products without CD columns => []');
+  console.log('✔ parseProductExcel operations (CD1..CD10) passed');
+
   // =========================================================================
   // 3. parseEmployeeExcel
   // =========================================================================
@@ -160,6 +202,7 @@ async function runExcelTests() {
       product_id: '1732',
       product_name: 'Cánh đập phản kích 2021',
       customer: 'Đại Phú',
+      operation: 'Mài đậu',
       quantity: 5,
       duration_hours: 4.0,
       notes: 'Gia công nhiệt luyện ca sáng'
@@ -214,6 +257,9 @@ async function runExcelTests() {
   assert.strictEqual(sheet1Data[0]['Số lượng'], 5);
   assert.strictEqual(sheet1Data[0]['Số giờ'], 4);
   assert.strictEqual(sheet1Data[0]['Ghi chú'], 'Gia công nhiệt luyện ca sáng');
+  assert.strictEqual(sheet1Data[0]['Tổ'], undefined, 'Detail sheet no longer has Tổ column');
+  assert.strictEqual(sheet1Data[0]['Công đoạn'], 'Mài đậu', 'Detail sheet has Công đoạn column');
+  assert.strictEqual(sheet1Data[2]['Công đoạn'] || '', '', 'Empty operation stays empty');
 
   // Check Sheet 2: Tong_Hop_Theo_Nhan_Vien
   const sheet2Data = XLSX.utils.sheet_to_json(readWb.Sheets['Tong_Hop_Theo_Nhan_Vien']);
@@ -222,7 +268,7 @@ async function runExcelTests() {
   const nv01Agg = sheet2Data.find((r) => r['Mã NV'] === 'NV01');
   assert.ok(nv01Agg, 'NV01 aggregated row must exist');
   assert.strictEqual(nv01Agg['Tên NV'], 'Trần Văn Hùng');
-  assert.strictEqual(nv01Agg['Tổ'], 'Tổ 1 - Cơ khí & Đúc');
+  assert.strictEqual(nv01Agg['Tổ'], undefined, 'Summary sheet no longer has Tổ column');
   assert.strictEqual(nv01Agg['Tổng sản phẩm'], 8, 'NV01 total quantity 5 + 3 = 8');
   assert.strictEqual(nv01Agg['Tổng giờ'], 6.5, 'NV01 total hours 4.0 + 2.5 = 6.5');
   assert.strictEqual(nv01Agg['Số ngày làm việc'], 2, 'NV01 worked on 2 distinct dates (10-28 and 10-29)');
@@ -266,6 +312,11 @@ async function runExcelTests() {
   const parsedTplProducts = parseProductExcel(prodTplBuf);
   assert.ok(parsedTplProducts.length > 0, 'Product template must have sample rows');
   assert.ok(parsedTplProducts[0].name, 'Product template sample row must have a name');
+  assert.deepStrictEqual(
+    parsedTplProducts[0].operations,
+    ['Mài đậu', 'Hoàn thiện', 'Nắn', 'Sơn', 'Đóng thùng'],
+    'Product template includes CD1..CD5 example'
+  );
 
   const empTplBuf = generateEmployeeTemplate({ returnBuffer: true });
   assert.ok(Buffer.isBuffer(empTplBuf) || empTplBuf instanceof Uint8Array);
@@ -273,6 +324,12 @@ async function runExcelTests() {
   assert.ok(parsedTplEmps.length > 0, 'Employee template must have sample rows');
   assert.ok(parsedTplEmps[0].code, 'Employee template sample row must have code');
   assert.ok(parsedTplEmps[0].full_name, 'Employee template sample row must have full_name');
+  const empTplSheet = XLSX.read(empTplBuf, { type: 'buffer' });
+  const empTplRows = XLSX.utils.sheet_to_json(empTplSheet.Sheets[empTplSheet.SheetNames[0]]);
+  assert.strictEqual(empTplRows[0]['Tổ / Bộ phận'], undefined, 'Employee template has no team column');
+  // Vẫn chấp nhận file nhân viên không có cột tổ
+  const noTeamEmps = parseEmployeeExcel(createExcelBuffer('E', [{ 'Mã NV': 'X1', 'Họ và tên': 'A' }]));
+  assert.strictEqual(noTeamEmps.length, 1);
   console.log('✔ generateProductTemplate and generateEmployeeTemplate passed');
 
   console.log('\n=========================================');

@@ -84,9 +84,11 @@ function saveWorkbook(wb, defaultFileName, options = {}) {
   }
 }
 
+const MAX_PRODUCT_OPERATIONS = 10;
+
 // Bảng ánh xạ các cột dữ liệu sản phẩm
 const PRODUCT_FIELD_MAP = {
-  id: ['id', 'masp', 'masanpham', 'productid', 'productcode', 'code', 'ma'],
+  id: ['id', 'masp', 'masanpham', 'productid', 'productcode', 'code', 'ma', 'iddonhang', 'idsanpham'],
   name: ['tensanpham', 'productname', 'name', 'tensp', 'sanpham', 'ten', 'tenhang'],
   customer: ['khachhang', 'customer', 'khach', 'doitac', 'tenkhachhang'],
   order_quantity: ['soluong', 'orderquantity', 'quantity', 'sl', 'soluongdonhang', 'soluongdat'],
@@ -112,9 +114,22 @@ export function parseProductExcel(data) {
 
   rawRows.forEach((row, index) => {
     const matched = {};
+    // Công đoạn: cột CD1..CD10 (hoặc CongDoan1..CongDoan10), giữ theo thứ tự số cột
+    const opsByIndex = [];
 
     for (const [colName, colVal] of Object.entries(row)) {
       const normKey = normalizeColumnKey(colName);
+
+      const opMatch = /^(?:cd|congdoan)(\d{1,2})$/.exec(normKey);
+      if (opMatch) {
+        const n = Number(opMatch[1]);
+        const text = colVal === undefined || colVal === null ? '' : String(colVal).trim();
+        if (n >= 1 && n <= MAX_PRODUCT_OPERATIONS && text) {
+          opsByIndex.push({ n, text });
+        }
+        continue;
+      }
+
       for (const [field, aliases] of Object.entries(PRODUCT_FIELD_MAP)) {
         if (aliases.includes(normKey)) {
           const isValEmpty = colVal === undefined || colVal === null || String(colVal).trim() === '';
@@ -174,7 +189,8 @@ export function parseProductExcel(data) {
       order_quantity: orderQuantity,
       blank_quantity: blankQuantity,
       status,
-      is_active_today: isActiveToday
+      is_active_today: isActiveToday,
+      operations: opsByIndex.sort((a, b) => a.n - b.n).map((o) => o.text)
     });
   });
 
@@ -227,7 +243,7 @@ export function parseEmployeeExcel(data) {
     const rawTeam = matched.team_name !== undefined ? String(matched.team_name).trim() : '';
 
     // Bỏ qua dòng trống
-    if (!rawCode && !rawFullName && !rawTeam) {
+    if (!rawCode && !rawFullName) {
       return;
     }
 
@@ -264,24 +280,24 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
   // 1. Chuẩn bị dữ liệu Sheet 1: Chi tiết sản lượng
   const detailRows = logs.map((log) => {
     const logDate = log.log_date || log.date || (log.created_at ? String(log.created_at).slice(0, 10) : '');
-    const teamName = log.team_name || (log.teams && log.teams.name) || '';
     const empCode = log.employee_code || (log.employees && (log.employees.code || log.employees.id)) || '';
     const empName = log.employee_name || (log.employees && (log.employees.full_name || log.employees.name)) || '';
     const prodId = log.product_id || (log.products && (log.products.id || log.products.code)) || '';
     const prodName = log.product_name || (log.products && log.products.name) || '';
     const customer = log.customer || (log.products && log.products.customer) || '';
+    const operation = log.operation || '';
     const qty = Number(log.quantity) || 0;
     const hours = Number(log.duration_hours) || 0;
     const notes = log.notes || '';
 
     return {
       'Ngày': logDate,
-      'Tổ': teamName,
       'Mã NV': empCode,
       'Tên NV': empName,
       'Mã SP': prodId,
       'Tên SP': prodName,
       'Khách hàng': customer,
+      'Công đoạn': operation,
       'Số lượng': qty,
       'Số giờ': hours,
       'Ghi chú': notes
@@ -290,18 +306,18 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
 
   const wsDetail = XLSX.utils.json_to_sheet(
     detailRows.length > 0 ? detailRows : [
-      { 'Ngày': '', 'Tổ': '', 'Mã NV': '', 'Tên NV': '', 'Mã SP': '', 'Tên SP': '', 'Khách hàng': '', 'Số lượng': '', 'Số giờ': '', 'Ghi chú': '' }
+      { 'Ngày': '', 'Mã NV': '', 'Tên NV': '', 'Mã SP': '', 'Tên SP': '', 'Khách hàng': '', 'Công đoạn': '', 'Số lượng': '', 'Số giờ': '', 'Ghi chú': '' }
     ]
   );
 
   wsDetail['!cols'] = [
     { wch: 12 }, // Ngày
-    { wch: 22 }, // Tổ
     { wch: 10 }, // Mã NV
     { wch: 22 }, // Tên NV
     { wch: 10 }, // Mã SP
     { wch: 35 }, // Tên SP
     { wch: 20 }, // Khách hàng
+    { wch: 16 }, // Công đoạn
     { wch: 12 }, // Số lượng
     { wch: 10 }, // Số giờ
     { wch: 30 }  // Ghi chú
@@ -315,7 +331,6 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
   for (const log of logs) {
     const empCode = log.employee_code || (log.employees && (log.employees.code || log.employees.id)) || 'CHUA_RO';
     const empName = log.employee_name || (log.employees && (log.employees.full_name || log.employees.name)) || '';
-    const teamName = log.team_name || (log.teams && log.teams.name) || '';
     const logDate = log.log_date || log.date || (log.created_at ? String(log.created_at).slice(0, 10) : '');
     const qty = Number(log.quantity) || 0;
     const hours = Number(log.duration_hours) || 0;
@@ -325,7 +340,6 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
       existing = {
         empCode,
         empName,
-        teamName,
         totalQty: 0,
         totalHours: 0,
         workDays: new Set()
@@ -334,7 +348,6 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     }
 
     if (!existing.empName && empName) existing.empName = empName;
-    if (!existing.teamName && teamName) existing.teamName = teamName;
     existing.totalQty += qty;
     existing.totalHours += hours;
     if (logDate) {
@@ -345,7 +358,6 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
   const summaryRows = Array.from(employeeSummaryMap.values()).map((item) => ({
     'Mã NV': item.empCode,
     'Tên NV': item.empName,
-    'Tổ': item.teamName,
     'Tổng sản phẩm': item.totalQty,
     'Tổng giờ': Math.round(item.totalHours * 100) / 100,
     'Số ngày làm việc': item.workDays.size
@@ -353,14 +365,13 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
 
   const wsSummary = XLSX.utils.json_to_sheet(
     summaryRows.length > 0 ? summaryRows : [
-      { 'Mã NV': '', 'Tên NV': '', 'Tổ': '', 'Tổng sản phẩm': '', 'Tổng giờ': '', 'Số ngày làm việc': '' }
+      { 'Mã NV': '', 'Tên NV': '', 'Tổng sản phẩm': '', 'Tổng giờ': '', 'Số ngày làm việc': '' }
     ]
   );
 
   wsSummary['!cols'] = [
     { wch: 10 }, // Mã NV
     { wch: 22 }, // Tên NV
-    { wch: 22 }, // Tổ
     { wch: 16 }, // Tổng sản phẩm
     { wch: 14 }, // Tổng giờ
     { wch: 18 }  // Số ngày làm việc
@@ -392,7 +403,12 @@ export function generateProductTemplate(options = {}) {
       'Khách hàng': 'Đại Phú',
       'Số lượng': 8,
       'Phôi': 3,
-      'T.t': 'Sx'
+      'T.t': 'Sx',
+      'CD1': 'Mài đậu',
+      'CD2': 'Hoàn thiện',
+      'CD3': 'Nắn',
+      'CD4': 'Sơn',
+      'CD5': 'Đóng thùng'
     },
     {
       'Mã SP': '1733',
@@ -400,7 +416,12 @@ export function generateProductTemplate(options = {}) {
       'Khách hàng': 'Đại Phú',
       'Số lượng': 2,
       'Phôi': 0,
-      'T.t': 'Sx'
+      'T.t': 'Sx',
+      'CD1': 'Hoàn thiện',
+      'CD2': 'Sơn',
+      'CD3': 'Đóng thùng',
+      'CD4': '',
+      'CD5': ''
     },
     {
       'Mã SP': '1775',
@@ -408,7 +429,12 @@ export function generateProductTemplate(options = {}) {
       'Khách hàng': 'Đại Phú',
       'Số lượng': 100,
       'Phôi': 30,
-      'T.t': 'Sx'
+      'T.t': 'Sx',
+      'CD1': 'Mài đậu',
+      'CD2': 'Nắn',
+      'CD3': '',
+      'CD4': '',
+      'CD5': ''
     }
   ];
 
@@ -419,7 +445,12 @@ export function generateProductTemplate(options = {}) {
     { wch: 22 },
     { wch: 12 },
     { wch: 10 },
-    { wch: 10 }
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 }
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Danh_Muc_SP');
@@ -436,25 +467,21 @@ export function generateEmployeeTemplate(options = {}) {
   const sampleEmployees = [
     {
       'Mã NV': 'NV01',
-      'Họ và tên': 'Trần Văn Hùng',
-      'Tổ / Bộ phận': 'Tổ 1 - Cơ khí & Đúc'
+      'Họ và tên': 'Trần Văn Hùng'
     },
     {
       'Mã NV': 'NV02',
-      'Họ và tên': 'Lê Văn Cường',
-      'Tổ / Bộ phận': 'Tổ 1 - Cơ khí & Đúc'
+      'Họ và tên': 'Lê Văn Cường'
     },
     {
       'Mã NV': 'NV04',
-      'Họ và tên': 'Phạm Văn Minh',
-      'Tổ / Bộ phận': 'Tổ 2 - Tiện & Phay'
+      'Họ và tên': 'Phạm Văn Minh'
     }
   ];
 
   const ws = XLSX.utils.json_to_sheet(sampleEmployees);
   ws['!cols'] = [
     { wch: 12 },
-    { wch: 25 },
     { wch: 25 }
   ];
 

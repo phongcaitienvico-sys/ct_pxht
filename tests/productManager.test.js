@@ -329,6 +329,21 @@ async function runProductManagerTests() {
 
   console.log('\n=========================================');
 
+  // Công đoạn trong validateProductInput
+  {
+    const withOps = validateProductInput({ name: 'A', operations: [' Mài đậu ', '', 'Sơn'] });
+    assert.deepStrictEqual(withOps.sanitized.operations, ['Mài đậu', 'Sơn']);
+    assert.strictEqual(withOps.valid, true);
+    const fromText = validateProductInput({ name: 'A', operations: 'Mài đậu\nSơn, Nắn' });
+    assert.deepStrictEqual(fromText.sanitized.operations, ['Mài đậu', 'Sơn', 'Nắn']);
+    assert.deepStrictEqual(validateProductInput({ name: 'A' }).sanitized.operations, []);
+    const tooMany = validateProductInput({ name: 'A', operations: Array.from({ length: 11 }, (_, i) => 'CD' + i) });
+    assert.strictEqual(tooMany.valid, false);
+    assert.ok(tooMany.errors.operations);
+    assert.strictEqual(tooMany.sanitized.operations.length, 10);
+    console.log('✔ validateProductInput operations passed');
+  }
+
   console.log('🎉 ALL PRODUCT MANAGER TESTS PASSED SUCCESSFULLY!');
   console.log('=========================================');
 }

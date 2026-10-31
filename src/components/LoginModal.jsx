@@ -142,7 +142,7 @@ export default function LoginModal() {
                 }}
                 className="p-2 text-left bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 rounded-lg transition-colors group"
               >
-                <div className="font-semibold text-slate-800 group-hover:text-emerald-700">📱 Tổ Trưởng 1 (ĐT)</div>
+                <div className="font-semibold text-slate-800 group-hover:text-emerald-700">📱 Người nhập liệu (ĐT)</div>
                 <div className="text-[11px] text-slate-500 font-mono mt-0.5">totruong1 / 123456</div>
               </button>
             </div>

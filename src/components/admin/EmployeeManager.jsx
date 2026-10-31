@@ -3,7 +3,6 @@ import {
   Users,
   UserPlus,
   Search,
-  Filter,
   Upload,
   Download,
   Edit2,
@@ -16,12 +15,10 @@ import {
   FileSpreadsheet,
   X,
   Check,
-  Building2,
   Info
 } from 'lucide-react';
 
 import {
-  getTeams,
   getEmployees,
   upsertEmployees,
   deleteEmployee
@@ -34,42 +31,15 @@ import {
 
 import { normalizeSearchText } from './realtimeFeedLogic.js';
 
-/**
- * Match a raw team name from Excel to an existing team ID in database
- */
-function resolveTeamId(teamName, teams) {
-  if (!teamName || !Array.isArray(teams) || teams.length === 0) return null;
-  const norm = normalizeSearchText(teamName);
-
-  // 1. Exact match or contains
-  const found = teams.find((t) => {
-    const tNorm = normalizeSearchText(t.name);
-    return tNorm === norm || tNorm.includes(norm) || norm.includes(tNorm);
-  });
-  if (found) return found.id;
-
-  // 2. Check "to 1", "to 2" etc.
-  const numMatch = norm.match(/\d+/);
-  if (numMatch) {
-    const num = numMatch[0];
-    const teamByNum = teams.find((t) => normalizeSearchText(t.name).includes(num));
-    if (teamByNum) return teamByNum.id;
-  }
-
-  return teams[0]?.id || null;
-}
-
 export default function EmployeeManager() {
   // Data states
   const [employees, setEmployees] = useState([]);
-  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState(null); // { type: 'success' | 'error' | 'info', message: string }
 
   // Search & Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [teamFilter, setTeamFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
 
   // Modal Thêm / Sửa states
@@ -79,7 +49,6 @@ export default function EmployeeManager() {
     id: '',
     code: '',
     full_name: '',
-    team_id: '',
     is_active: true
   });
   const [formErrors, setFormErrors] = useState({});
@@ -111,12 +80,8 @@ export default function EmployeeManager() {
       if (!isSilent) setLoading(true);
       else setRefreshing(true);
 
-      const [teamsData, employeesData] = await Promise.all([
-        getTeams(),
-        getEmployees()
-      ]);
+      const employeesData = await getEmployees();
 
-      setTeams(teamsData || []);
       setEmployees(employeesData || []);
     } catch (err) {
       console.error('Error loading employee data:', err);
@@ -131,41 +96,28 @@ export default function EmployeeManager() {
     fetchData();
   }, []);
 
-  // Map team ID to Team Name helper
-  const teamMap = useMemo(() => {
-    const map = new Map();
-    teams.forEach((t) => map.set(t.id, t.name));
-    return map;
-  }, [teams]);
-
   // Filtered employees list
   const filteredEmployees = useMemo(() => {
     const query = normalizeSearchText(searchTerm);
     return employees.filter((emp) => {
       if (!emp) return false;
 
-      // 1. Team filter
-      if (teamFilter !== 'all' && emp.team_id !== teamFilter) {
-        return false;
-      }
-
-      // 2. Status filter
+      // 1. Status filter
       if (statusFilter === 'active' && !emp.is_active) return false;
       if (statusFilter === 'inactive' && emp.is_active) return false;
 
-      // 3. Search query (code or full_name)
+      // 2. Search query (code or full_name)
       if (query) {
         const codeNorm = normalizeSearchText(emp.code);
         const nameNorm = normalizeSearchText(emp.full_name);
-        const teamName = normalizeSearchText(teamMap.get(emp.team_id) || '');
-        if (!codeNorm.includes(query) && !nameNorm.includes(query) && !teamName.includes(query)) {
+        if (!codeNorm.includes(query) && !nameNorm.includes(query)) {
           return false;
         }
       }
 
       return true;
     });
-  }, [employees, teamFilter, statusFilter, searchTerm, teamMap]);
+  }, [employees, statusFilter, searchTerm]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -177,10 +129,9 @@ export default function EmployeeManager() {
     return {
       total,
       active,
-      inactive: total - active,
-      teamsCount: teams.length
+      inactive: total - active
     };
-  }, [employees, teams]);
+  }, [employees]);
 
   // Open Add Modal
   const handleOpenAddModal = () => {
@@ -189,7 +140,6 @@ export default function EmployeeManager() {
       id: '',
       code: `NV${String(employees.length + 1).padStart(2, '0')}`,
       full_name: '',
-      team_id: teams[0]?.id || '',
       is_active: true
     });
     setFormErrors({});
@@ -203,7 +153,6 @@ export default function EmployeeManager() {
       id: emp.id || '',
       code: emp.code || '',
       full_name: emp.full_name || '',
-      team_id: emp.team_id || (teams[0]?.id || ''),
       is_active: emp.is_active !== undefined ? Boolean(emp.is_active) : true
     });
     setFormErrors({});
@@ -234,10 +183,6 @@ export default function EmployeeManager() {
       errors.full_name = 'Họ và tên nhân viên không được để trống';
     }
 
-    if (!formData.team_id) {
-      errors.team_id = 'Vui lòng chọn Tổ sản xuất';
-    }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -253,7 +198,6 @@ export default function EmployeeManager() {
         id: formData.id || undefined,
         code: String(formData.code).trim().toUpperCase(),
         full_name: String(formData.full_name).trim(),
-        team_id: formData.team_id,
         is_active: Boolean(formData.is_active)
       };
 
@@ -350,18 +294,11 @@ export default function EmployeeManager() {
         return;
       }
 
-      // Map parsed employees with team IDs
-      const mapped = rawParsed.map((item) => {
-        const teamId = resolveTeamId(item.team_name, teams);
-        return {
-          code: item.code,
-          full_name: item.full_name,
-          team_id: teamId,
-          team_name_raw: item.team_name || '',
-          team_name_resolved: teamMap.get(teamId) || 'Chưa phân tổ',
-          is_active: item.is_active !== undefined ? Boolean(item.is_active) : true
-        };
-      });
+      const mapped = rawParsed.map((item) => ({
+        code: item.code,
+        full_name: item.full_name,
+        is_active: item.is_active !== undefined ? Boolean(item.is_active) : true
+      }));
 
       setParsedPreview(mapped);
     } catch (err) {
@@ -380,7 +317,6 @@ export default function EmployeeManager() {
       const employeesToUpsert = parsedPreview.map((item) => ({
         code: item.code,
         full_name: item.full_name,
-        team_id: item.team_id,
         is_active: item.is_active
       }));
 
@@ -429,7 +365,7 @@ export default function EmployeeManager() {
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
-            Danh sách nhân viên theo tổ cơ khí, phân quyền và trạng thái công việc
+            Danh sách nhân viên và trạng thái công việc
           </p>
         </div>
 
@@ -475,7 +411,7 @@ export default function EmployeeManager() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
             <Users className="w-5 h-5" />
@@ -506,15 +442,6 @@ export default function EmployeeManager() {
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-indigo-600">{stats.teamsCount}</div>
-            <div className="text-xs text-slate-500">Tổ sản xuất</div>
-          </div>
-        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -541,23 +468,6 @@ export default function EmployeeManager() {
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Team Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 border border-slate-200 rounded-lg">
-            <Filter className="w-3.5 h-3.5 text-slate-500" />
-            <select
-              value={teamFilter}
-              onChange={(e) => setTeamFilter(e.target.value)}
-              className="text-xs font-medium text-slate-700 bg-transparent border-none focus:outline-none cursor-pointer pr-2"
-            >
-              <option value="all">Tất cả tổ</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Status Filter */}
           <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 border border-slate-200 rounded-lg">
             <select
@@ -572,11 +482,10 @@ export default function EmployeeManager() {
           </div>
 
           {/* Reset Filters */}
-          {(searchTerm || teamFilter !== 'all' || statusFilter !== 'all') && (
+          {(searchTerm || statusFilter !== 'all') && (
             <button
               onClick={() => {
                 setSearchTerm('');
-                setTeamFilter('all');
                 setStatusFilter('all');
               }}
               className="px-2.5 py-1.5 text-xs text-blue-600 hover:text-blue-800 hover:underline"
@@ -599,7 +508,7 @@ export default function EmployeeManager() {
             <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <p className="text-base font-semibold text-slate-700">Không tìm thấy nhân viên phù hợp</p>
             <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
-              Thử thay đổi từ khóa tìm kiếm hoặc chọn lọc theo tổ khác.
+              Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái.
             </p>
           </div>
         ) : (
@@ -611,14 +520,12 @@ export default function EmployeeManager() {
                   <th className="py-3 px-4 w-12 text-center">STT</th>
                   <th className="py-3 px-4">Mã NV</th>
                   <th className="py-3 px-4">Họ và Tên</th>
-                  <th className="py-3 px-4">Tổ / Bộ Phận</th>
                   <th className="py-3 px-4 text-center">Trạng Thái</th>
                   <th className="py-3 px-4 text-right">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredEmployees.map((emp, idx) => {
-                  const teamName = teamMap.get(emp.team_id) || 'Chưa phân tổ';
                   const initials = emp.full_name
                     ? emp.full_name
                         .split(' ')
@@ -658,14 +565,6 @@ export default function EmployeeManager() {
                             </div>
                           </div>
                         </div>
-                      </td>
-
-                      {/* Tổ / Phân Xưởng */}
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                          <Building2 className="w-3 h-3 text-blue-500" />
-                          {teamName}
-                        </span>
                       </td>
 
                       {/* Trạng Thái */}
@@ -722,7 +621,6 @@ export default function EmployeeManager() {
           {/* Mobile Employee Cards (< md) */}
           <div className="md:hidden divide-y divide-slate-100 p-2.5 space-y-2.5">
             {filteredEmployees.map((emp) => {
-              const teamName = teamMap.get(emp.team_id) || 'Chưa phân tổ';
               const initials = emp.full_name
                 ? emp.full_name
                     .split(' ')
@@ -748,9 +646,6 @@ export default function EmployeeManager() {
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="font-mono text-xs font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
                             {emp.code}
-                          </span>
-                          <span className="text-xs text-blue-700 font-medium">
-                            {teamName}
                           </span>
                         </div>
                       </div>
@@ -863,27 +758,6 @@ export default function EmployeeManager() {
                 )}
               </div>
 
-              {/* Tổ sản xuất */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Tổ Sản Xuất <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={formData.team_id}
-                  onChange={(e) => setFormData({ ...formData, team_id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white"
-                >
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.team_id && (
-                  <p className="text-xs text-rose-500 mt-1">{formErrors.team_id}</p>
-                )}
-              </div>
-
               {/* Trạng thái hoạt động */}
               <div className="pt-2">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -957,7 +831,7 @@ export default function EmployeeManager() {
                   <div>
                     <h4 className="text-sm font-bold text-emerald-950">Chưa có file mẫu nhân sự?</h4>
                     <p className="text-xs text-emerald-800/80 mt-0.5">
-                      Tải file mẫu chuẩn (.xlsx) có sẵn cột: <strong>Mã NV</strong>, <strong>Họ và tên</strong>, <strong>Tổ / Bộ phận</strong>
+                      Tải file mẫu chuẩn (.xlsx) có sẵn cột: <strong>Mã NV</strong>, <strong>Họ và tên</strong>
                     </p>
                   </div>
                 </div>
@@ -988,7 +862,7 @@ export default function EmployeeManager() {
                   {importFile ? importFile.name : 'Bấm để chọn file Excel (.xlsx, .xls)'}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Hệ thống tự động nhận diện các cột: Mã NV, Họ và Tên, Tổ / Bộ Phận
+                  Hệ thống tự động nhận diện các cột: Mã NV, Họ và Tên
                 </p>
               </div>
 
@@ -1019,7 +893,6 @@ export default function EmployeeManager() {
                           <th className="p-2 w-10 text-center">STT</th>
                           <th className="p-2">Mã NV</th>
                           <th className="p-2">Họ Tên</th>
-                          <th className="p-2">Tổ Ghép Khớp</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1030,11 +903,6 @@ export default function EmployeeManager() {
                               {item.code}
                             </td>
                             <td className="p-2 text-slate-700">{item.full_name}</td>
-                            <td className="p-2">
-                              <span className="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium text-[11px]">
-                                {item.team_name_resolved}
-                              </span>
-                            </td>
                           </tr>
                         ))}
                       </tbody>

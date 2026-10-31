@@ -88,6 +88,7 @@ export const seedProducts = [
     order_quantity: 8,
     blank_quantity: 3,
     status: 'Sx',
+    operations: ['Mài đậu', 'Hoàn thiện', 'Nắn', 'Sơn', 'Đóng thùng'],
     is_active_today: true
   },
   {
@@ -97,6 +98,7 @@ export const seedProducts = [
     order_quantity: 2,
     blank_quantity: 0,
     status: 'Sx',
+    operations: ['Hoàn thiện', 'Sơn', 'Đóng thùng'],
     is_active_today: true
   },
   {
@@ -106,6 +108,7 @@ export const seedProducts = [
     order_quantity: 64,
     blank_quantity: 16,
     status: 'Sx',
+    operations: ['Mài đậu', 'Hoàn thiện', 'Nắn', 'Sơn', 'Đóng thùng'],
     is_active_today: true
   },
   {
@@ -115,6 +118,7 @@ export const seedProducts = [
     order_quantity: 100,
     blank_quantity: 30,
     status: 'Sx',
+    operations: ['Mài đậu', 'Nắn', 'Hoàn thiện'],
     is_active_today: true
   },
   {
@@ -142,6 +146,7 @@ export const seedProducts = [
     order_quantity: 22,
     blank_quantity: 0,
     status: 'Sx',
+    operations: ['Hoàn thiện', 'Sơn'],
     is_active_today: true
   },
   {
@@ -160,6 +165,7 @@ export const seedProducts = [
     order_quantity: 18,
     blank_quantity: 4,
     status: 'Sx',
+    operations: ['Mài đậu', 'Hoàn thiện', 'Đóng thùng'],
     is_active_today: true
   },
   {
@@ -211,6 +217,7 @@ export function getDynamicSeedLogs() {
       team_id: 'a0000000-0000-0000-0000-000000000001',
       employee_id: 'e0000000-0000-0000-0000-000000000001',
       product_id: '1732',
+      operation: 'Mài đậu',
       quantity: 4,
       duration_hours: 3.5,
       notes: 'Tiện khỏa mặt & doa lỗ',
@@ -222,6 +229,7 @@ export function getDynamicSeedLogs() {
       team_id: 'a0000000-0000-0000-0000-000000000001',
       employee_id: 'e0000000-0000-0000-0000-000000000001',
       product_id: '1733',
+      operation: 'Hoàn thiện',
       quantity: 1,
       duration_hours: 4.0,
       notes: 'Gia công gối đỡ bi',
@@ -233,6 +241,7 @@ export function getDynamicSeedLogs() {
       team_id: 'a0000000-0000-0000-0000-000000000001',
       employee_id: 'e0000000-0000-0000-0000-000000000002',
       product_id: '1775',
+      operation: 'Mài đậu',
       quantity: 20,
       duration_hours: 7.5,
       notes: 'Phay rãnh cánh búa',
@@ -244,6 +253,7 @@ export function getDynamicSeedLogs() {
       team_id: 'a0000000-0000-0000-0000-000000000002',
       employee_id: 'e0000000-0000-0000-0000-000000000004',
       product_id: '1816',
+      operation: 'Hoàn thiện',
       quantity: 3,
       duration_hours: 6.0,
       notes: 'Tiện tinh moay ơ đĩa búa',
@@ -255,6 +265,7 @@ export function getDynamicSeedLogs() {
       team_id: 'a0000000-0000-0000-0000-000000000001',
       employee_id: 'e0000000-0000-0000-0000-000000000001',
       product_id: '1732',
+      operation: 'Nắn',
       quantity: 2,
       duration_hours: 4.0,
       notes: 'Gia công nhiệt luyện',
@@ -266,6 +277,7 @@ export function getDynamicSeedLogs() {
       team_id: 'a0000000-0000-0000-0000-000000000001',
       employee_id: 'e0000000-0000-0000-0000-000000000002',
       product_id: '1775',
+      operation: 'Nắn',
       quantity: 15,
       duration_hours: 6.5,
       notes: 'Phay tinh bề mặt',
@@ -277,6 +289,7 @@ export function getDynamicSeedLogs() {
       team_id: 'a0000000-0000-0000-0000-000000000002',
       employee_id: 'e0000000-0000-0000-0000-000000000005',
       product_id: '1462',
+      operation: 'Hoàn thiện',
       quantity: 5,
       duration_hours: 7.0,
       notes: 'Khoan lỗ bắt bu lông',

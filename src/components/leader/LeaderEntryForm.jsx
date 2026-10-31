@@ -23,7 +23,6 @@ import {
 import {
   getEmployees,
   getProducts,
-  getTeams,
   submitProductionLogs
 } from '../../lib/supabase.js';
 
@@ -36,35 +35,28 @@ import {
   filterActiveProducts,
   filterTeamEmployees,
   formatProductLabel,
-  calculateFormTotals,
-  DEMO_TEAM_MAP
+  calculateFormTotals
 } from './leaderEntryLogic.js';
 
 /**
- * Màn hình nhập sản lượng của Tổ trưởng (Mobile-First)
+ * Màn hình nhập sản lượng của Người nhập liệu (Mobile-First)
  * Cho phép 1 chạm lưu nhiều sản phẩm đã gia công cho 1 thợ trong ngày.
  */
 export default function LeaderEntryForm({
-  teamId: propTeamId,
   userId: propUserId,
-  teamName: propTeamName,
   initialEmployees,
   initialProducts,
   onSuccess
 }) {
   // Auth context fallback
   const auth = useContext(AuthContext);
-  const currentTeam = auth?.currentTeam;
   const currentUser = auth?.currentUser;
 
-  const rawTeamId = propTeamId || currentTeam?.id || null;
-  const effectiveTeamId = DEMO_TEAM_MAP[rawTeamId] || rawTeamId;
   const effectiveUserId = propUserId || currentUser?.id || null;
 
   // Master data
   const [employees, setEmployees] = useState(initialEmployees || []);
   const [products, setProducts] = useState(initialProducts || []);
-  const [teams, setTeams] = useState([]);
   const [loadingData, setLoadingData] = useState(!initialEmployees || !initialProducts);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -72,7 +64,6 @@ export default function LeaderEntryForm({
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [logDate, setLogDate] = useState(todayStr);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [includeOtherTeams, setIncludeOtherTeams] = useState(false);
   const [rows, setRows] = useState([createEmptyRow()]);
   const [keepWorkerAfterSave, setKeepWorkerAfterSave] = useState(false);
 
@@ -90,16 +81,14 @@ export default function LeaderEntryForm({
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const [empList, prodList, teamList] = await Promise.all([
+      const [empList, prodList] = await Promise.all([
         getEmployees(),
-        getProducts(),
-        getTeams()
+        getProducts()
       ]);
       setEmployees(empList || []);
       setProducts(prodList || []);
-      setTeams(teamList || []);
     } catch (err) {
-      console.error('Lỗi khi tải dữ liệu cho form Tổ trưởng:', err);
+      console.error('Lỗi khi tải dữ liệu cho form nhập liệu:', err);
       setToast({
         type: 'error',
         message: 'Không thể kết nối cơ sở dữ liệu. Vui lòng thử lại!'
@@ -122,24 +111,14 @@ export default function LeaderEntryForm({
   }, [products]);
 
   const filteredEmployees = useMemo(() => {
-    return filterTeamEmployees(employees, effectiveTeamId, includeOtherTeams);
-  }, [employees, effectiveTeamId, includeOtherTeams]);
+    // Không còn khái niệm tổ: liệt kê toàn bộ thợ đang hoạt động
+    return filterTeamEmployees(employees, null, true);
+  }, [employees]);
 
   // Current selected employee object
   const selectedEmployee = useMemo(() => {
     return employees.find((e) => e.id === selectedEmployeeId) || null;
   }, [employees, selectedEmployeeId]);
-
-  // Active team name resolution
-  const displayTeamName = useMemo(() => {
-    if (propTeamName) return propTeamName;
-    if (currentTeam?.name) return currentTeam.name;
-    if (effectiveTeamId && teams.length > 0) {
-      const found = teams.find((t) => t.id === effectiveTeamId);
-      if (found) return found.name;
-    }
-    return 'Tổ Sản Xuất';
-  }, [propTeamName, currentTeam, effectiveTeamId, teams]);
 
   // Form quick totals
   const totals = useMemo(() => {
@@ -166,6 +145,10 @@ export default function LeaderEntryForm({
     setRows((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
+      // Đổi sản phẩm -> công đoạn cũ không còn hợp lệ
+      if (field === 'product_id') {
+        updated[index].operation = '';
+      }
       return updated;
     });
 
@@ -230,7 +213,7 @@ export default function LeaderEntryForm({
       rows
     };
 
-    const validation = validateEntryForm(formData);
+    const validation = validateEntryForm(formData, products);
     if (!validation.isValid) {
       setFormErrors(validation.errors);
       setToast({
@@ -245,7 +228,7 @@ export default function LeaderEntryForm({
     setFormErrors({ employee_id: '', rows: {}, duplicateProductIds: [], general: '' });
 
     try {
-      const payload = buildBatchPayload(formData, effectiveTeamId, effectiveUserId);
+      const payload = buildBatchPayload(formData, null, effectiveUserId);
       const result = await submitProductionLogs(payload);
 
       const workerName = selectedEmployee ? selectedEmployee.full_name : 'thợ';
@@ -326,7 +309,7 @@ export default function LeaderEntryForm({
                 </h1>
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-blue-100">
                   <span className="inline-flex items-center gap-1 font-medium bg-white/20 px-2 py-0.5 rounded-full">
-                    {displayTeamName}
+                    Nhập sản lượng
                   </span>
                   <span>•</span>
                   <span>1 chạm lưu nhiều món</span>
@@ -422,16 +405,6 @@ export default function LeaderEntryForm({
                     <User className="w-3.5 h-3.5 text-blue-600" />
                     Thợ thực hiện <span className="text-rose-500">*</span>
                   </label>
-                  <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={includeOtherTeams}
-                      onChange={(e) => setIncludeOtherTeams(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                    />
-                    <Users className="w-3 h-3 text-slate-500" />
-                    <span>Xem thợ tổ khác</span>
-                  </label>
                 </div>
 
                 <div className="relative">
@@ -450,17 +423,12 @@ export default function LeaderEntryForm({
                     }`}
                   >
                     <option value="">-- Bấm để chọn thợ --</option>
-                    {filteredEmployees.map((emp) => {
-                      const empTeam = teams.find((t) => t.id === emp.team_id);
-                      const isOtherTeam = effectiveTeamId && emp.team_id !== effectiveTeamId;
-                      return (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.code ? `[${emp.code}] ` : ''}
-                          {emp.full_name}
-                          {isOtherTeam && empTeam ? ` (Mượn từ: ${empTeam.name})` : ''}
-                        </option>
-                      );
-                    })}
+                    {filteredEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.code ? `[${emp.code}] ` : ''}
+                        {emp.full_name}
+                      </option>
+                    ))}
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center px-3.5 pointer-events-none text-slate-400">
                     ▼
@@ -493,6 +461,9 @@ export default function LeaderEntryForm({
                 {rows.map((row, index) => {
                   const rowError = formErrors.rows[index] || {};
                   const isDuplicate = formErrors.duplicateProductIds?.includes(row.product_id);
+                  const rowProduct = products.find((p) => p.id === row.product_id);
+                  const rowOperations =
+                    rowProduct && Array.isArray(rowProduct.operations) ? rowProduct.operations : [];
 
                   return (
                     <div
@@ -563,6 +534,44 @@ export default function LeaderEntryForm({
                           </p>
                         )}
                       </div>
+
+                      {/* Chọn công đoạn (chỉ hiện khi sản phẩm có công đoạn) */}
+                      {rowOperations.length > 0 && (
+                        <div className="mb-3">
+                          <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                            <Layers className="w-3.5 h-3.5 text-blue-600" />
+                            Công đoạn <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <select
+                              value={row.operation || ''}
+                              onChange={(e) => handleRowChange(index, 'operation', e.target.value)}
+                              className={`w-full min-h-[48px] px-3 py-2.5 rounded-xl border bg-white text-slate-800 text-sm font-medium shadow-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none ${
+                                rowError.operation
+                                  ? 'border-rose-400 bg-rose-50/40 text-rose-900 focus:ring-rose-400'
+                                  : 'border-slate-300'
+                              }`}
+                            >
+                              <option value="">-- Chọn công đoạn --</option>
+                              {rowOperations.map((op) => (
+                                <option key={op} value={op}>
+                                  {op}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
+                              ▼
+                            </div>
+                          </div>
+
+                          {rowError.operation && (
+                            <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                              {rowError.operation}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* 2 Cột: Số lượng & Thời gian */}
                       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 mb-2.5">

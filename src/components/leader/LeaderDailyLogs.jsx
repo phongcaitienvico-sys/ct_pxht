@@ -24,8 +24,7 @@ import {
   getProductionLogs,
   updateProductionLog,
   deleteProductionLog,
-  subscribeToLogs,
-  getTeams
+  subscribeToLogs
 } from '../../lib/supabase.js';
 
 import { AuthContext } from '../../contexts/AuthContext.jsx';
@@ -37,33 +36,19 @@ import {
   validateEditInput,
   getEmployeeInitials,
   getQuickDate,
-  formatDateDisplay,
-  DEMO_TEAM_MAP
+  formatDateDisplay
 } from './leaderDailyLogsLogic.js';
 
 /**
- * Màn hình Lịch sử & Chỉnh sửa Sản lượng trong ngày của Tổ trưởng (Mobile-First)
+ * Màn hình Lịch sử & Chỉnh sửa Sản lượng trong ngày của Người nhập liệu (Mobile-First)
  * Cho phép xem theo ngày, nhóm theo thợ, chỉnh sửa số lượng / giờ làm, hoặc xóa bản ghi nhầm.
  */
 export default function LeaderDailyLogs({
-  teamId: propTeamId,
-  userId: propUserId,
-  teamName: propTeamName,
   initialDate,
   onNavigateToEntry
 }) {
-  // Auth context
-  const auth = useContext(AuthContext);
-  const currentTeam = auth?.currentTeam;
-  const currentUser = auth?.currentUser;
-
-  const rawTeamId = propTeamId || currentTeam?.id || null;
-  const effectiveTeamId = DEMO_TEAM_MAP[rawTeamId] || rawTeamId;
-  const effectiveUserId = propUserId || currentUser?.id || null;
-
   // Selected Date state (defaults to today)
   const [selectedDate, setSelectedDate] = useState(() => initialDate || getQuickDate('today'));
-  const [teams, setTeams] = useState([]);
 
   // Data state
   const [rawLogs, setRawLogs] = useState([]);
@@ -93,33 +78,7 @@ export default function LeaderDailyLogs({
   const [deletingLog, setDeletingLog] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fetch teams if team name needs to be resolved
-  useEffect(() => {
-    let mounted = true;
-    getTeams()
-      .then((data) => {
-        if (mounted && Array.isArray(data)) {
-          setTeams(data);
-        }
-      })
-      .catch((err) => console.warn('Could not load teams:', err));
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Display team name
-  const displayTeamName = useMemo(() => {
-    if (propTeamName) return propTeamName;
-    if (currentTeam?.name) return currentTeam.name;
-    if (effectiveTeamId && teams.length > 0) {
-      const found = teams.find((t) => t.id === effectiveTeamId);
-      if (found) return found.name;
-    }
-    return 'Tổ Sản Xuất';
-  }, [propTeamName, currentTeam, effectiveTeamId, teams]);
-
-  // Load logs for the selected date & team
+  // Load logs for the selected date (all workers)
   const fetchLogs = useCallback(
     async (isManualRefresh = false) => {
       if (isManualRefresh) {
@@ -129,12 +88,7 @@ export default function LeaderDailyLogs({
       }
 
       try {
-        const filter = { date: selectedDate };
-        if (effectiveTeamId) {
-          filter.teamId = effectiveTeamId;
-        }
-
-        const data = await getProductionLogs(filter);
+        const data = await getProductionLogs({ date: selectedDate });
         setRawLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Lỗi khi tải nhật ký sản lượng:', err);
@@ -144,7 +98,7 @@ export default function LeaderDailyLogs({
         setRefreshing(false);
       }
     },
-    [selectedDate, effectiveTeamId, showToast]
+    [selectedDate, showToast]
   );
 
   useEffect(() => {
@@ -166,8 +120,8 @@ export default function LeaderDailyLogs({
 
   // Filter and compute data
   const dateLogs = useMemo(() => {
-    return filterLogsByDateAndTeam(rawLogs, selectedDate, effectiveTeamId);
-  }, [rawLogs, selectedDate, effectiveTeamId]);
+    return filterLogsByDateAndTeam(rawLogs, selectedDate, null);
+  }, [rawLogs, selectedDate]);
 
   // Search filter
   const displayedLogs = useMemo(() => {
@@ -327,7 +281,7 @@ export default function LeaderDailyLogs({
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 uppercase tracking-wider">
               <Layers className="w-3.5 h-3.5" />
-              <span>{displayTeamName}</span>
+              <span>Nhập liệu</span>
             </div>
             <h1 className="text-lg font-bold text-slate-800 tracking-tight">
               Lịch Sử & Nhật Ký Trong Ngày
@@ -498,7 +452,7 @@ export default function LeaderDailyLogs({
               <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
                 {searchQuery
                   ? `Không có bản ghi nào khớp với từ khóa "${searchQuery}". Thử xóa tìm kiếm.`
-                  : `Ngày ${formatDateDisplay(selectedDate)} chưa có sản lượng nào được ghi nhận cho ${displayTeamName}.`}
+                  : `Ngày ${formatDateDisplay(selectedDate)} chưa có sản lượng nào được ghi nhận.`}
               </p>
             </div>
 
@@ -586,6 +540,11 @@ export default function LeaderDailyLogs({
                               {prodId && (
                                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                   #{prodId}
+                                </span>
+                              )}
+                              {log.operation && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  Công đoạn: {log.operation}
                                 </span>
                               )}
                             </div>
@@ -679,6 +638,12 @@ export default function LeaderDailyLogs({
                     {editingLog.product_name || editingLog.products?.name} (#{editingLog.product_id})
                   </span>
                 </div>
+                {editingLog.operation && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-medium">Công đoạn:</span>
+                    <span className="font-bold text-slate-800">{editingLog.operation}</span>
+                  </div>
+                )}
               </div>
 
               {/* Edit Quantity with +/- touch buttons */}

@@ -7,7 +7,6 @@ import {
   Users,
   Package,
   Search,
-  Filter,
   RefreshCw,
   RotateCcw,
   Edit2,
@@ -18,7 +17,6 @@ import {
   X,
   Check,
   Calendar,
-  Building2,
   Loader2,
   FileSpreadsheet,
   Info
@@ -26,7 +24,6 @@ import {
 
 import {
   getProductionLogs,
-  getTeams,
   getProducts,
   updateProductionLog,
   deleteProductionLog,
@@ -50,7 +47,6 @@ import {
 export default function RealtimeFeed() {
   // Logs & Master data
   const [logs, setLogs] = useState([]);
-  const [teams, setTeams] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,7 +57,6 @@ export default function RealtimeFeed() {
   const [recentInsertedId, setRecentInsertedId] = useState(null);
 
   // Filters
-  const [teamFilter, setTeamFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today'); // 'today' | 'all' | 'custom'
   const [customDate, setCustomDate] = useState(getTodayDateString());
@@ -95,14 +90,12 @@ export default function RealtimeFeed() {
       if (!isSilent) setLoading(true);
       else setRefreshing(true);
 
-      const [logsData, teamsData, productsData] = await Promise.all([
+      const [logsData, productsData] = await Promise.all([
         getProductionLogs(),
-        getTeams(),
         getProducts()
       ]);
 
       setLogs(logsData || []);
-      setTeams(teamsData || []);
       setProducts(productsData || []);
       setLastSyncTime(new Date());
     } catch (err) {
@@ -185,11 +178,10 @@ export default function RealtimeFeed() {
   // Filtered Logs
   const filteredLogs = useMemo(() => {
     return filterLogs(logs, {
-      teamId: teamFilter,
       searchTerm: searchTerm,
       date: activeFilterDate
     });
-  }, [logs, teamFilter, searchTerm, activeFilterDate]);
+  }, [logs, searchTerm, activeFilterDate]);
 
   // Open Edit Modal
   const handleOpenEdit = (log) => {
@@ -315,7 +307,7 @@ export default function RealtimeFeed() {
             </div>
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
-            Tự động cập nhật tức thì khi Tổ trưởng gửi nhật ký từ xưởng • Cập nhật lúc:{' '}
+            Tự động cập nhật tức thì khi người nhập liệu gửi nhật ký từ xưởng • Cập nhật lúc:{' '}
             <span className="font-medium text-slate-700">
               {lastSyncTime.toLocaleTimeString('vi-VN')}
             </span>
@@ -428,11 +420,11 @@ export default function RealtimeFeed() {
           </div>
         </div>
 
-        {/* Card 4: Tổ đã báo cáo */}
+        {/* Card 4: Số lượt nhập */}
         <div className="bg-white p-3 sm:p-4 rounded-xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/30 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
-              Tổ Đã Nhập Dữ Liệu
+              Số Lượt Nhập
             </span>
             <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
               <Layers className="w-4 h-4" />
@@ -440,14 +432,11 @@ export default function RealtimeFeed() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-extrabold text-amber-900">
-              {currentKPI.activeTeamsCount}
-            </span>
-            <span className="text-xs font-medium text-amber-600">
-              / {teams.length} tổ
+              {currentKPI.totalLogsCount}
             </span>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            Tiến độ báo cáo từ các tổ
+            Số lượt ghi nhận sản lượng
           </div>
         </div>
       </div>
@@ -474,7 +463,7 @@ export default function RealtimeFeed() {
           )}
         </div>
 
-        {/* Date & Team Filters */}
+        {/* Date Filters */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Quick Date Selector */}
           <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs font-medium">
@@ -520,22 +509,6 @@ export default function RealtimeFeed() {
             />
           )}
 
-          {/* Team Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 border border-slate-200 rounded-lg">
-            <Filter className="w-3.5 h-3.5 text-slate-500" />
-            <select
-              value={teamFilter}
-              onChange={(e) => setTeamFilter(e.target.value)}
-              className="text-xs font-medium text-slate-700 bg-transparent border-none focus:outline-none cursor-pointer pr-2"
-            >
-              <option value="all">Tất cả tổ</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 
@@ -551,7 +524,7 @@ export default function RealtimeFeed() {
             <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <p className="text-base font-semibold text-slate-700">Chưa có nhật ký nào phù hợp</p>
             <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
-              Khi tổ trưởng nhập sản lượng từ điện thoại, dữ liệu sẽ tự động xuất hiện tại đây theo thời gian thực.
+              Khi người nhập liệu nhập sản lượng từ điện thoại, dữ liệu sẽ tự động xuất hiện tại đây theo thời gian thực.
             </p>
           </div>
         ) : (
@@ -561,7 +534,6 @@ export default function RealtimeFeed() {
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   <th className="py-3 px-4 w-28">Thời Điểm</th>
-                  <th className="py-3 px-4">Tổ</th>
                   <th className="py-3 px-4">Công Nhân</th>
                   <th className="py-3 px-4">Chi Tiết Sản Phẩm</th>
                   <th className="py-3 px-4 text-center">Số Lượng</th>
@@ -583,8 +555,6 @@ export default function RealtimeFeed() {
                     log.product_id || (log.products && log.products.id) || '';
                   const customer =
                     log.customer || (log.products && log.products.customer) || '';
-                  const teamName =
-                    log.team_name || (log.teams && log.teams.name) || 'Tổ sản xuất';
 
                   return (
                     <tr
@@ -608,14 +578,6 @@ export default function RealtimeFeed() {
                         )}
                       </td>
 
-                      {/* Tổ */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                          <Building2 className="w-3 h-3 text-blue-500" />
-                          {teamName}
-                        </span>
-                      </td>
-
                       {/* Công nhân */}
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-slate-800">{empName}</div>
@@ -627,6 +589,11 @@ export default function RealtimeFeed() {
                         <div className="font-medium text-slate-800 truncate" title={prodName}>
                           {prodName}
                         </div>
+                        {log.operation && (
+                          <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                            {log.operation}
+                          </span>
+                        )}
                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                           <span className="font-mono text-slate-400">#{prodId}</span>
                           {customer && (
@@ -667,7 +634,7 @@ export default function RealtimeFeed() {
                           <button
                             onClick={() => handleOpenEdit(log)}
                             className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Sửa bản ghi (nếu tổ trưởng báo nhầm)"
+                            title="Sửa bản ghi (nếu người nhập liệu báo nhầm)"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -700,15 +667,12 @@ export default function RealtimeFeed() {
                       : 'bg-white border-slate-200/90 shadow-xs'
                   }`}
                 >
-                  {/* Row 1: Time, Team & Stats */}
+                  {/* Row 1: Time & Stats */}
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
                         <Clock className="w-3 h-3 mr-1 text-slate-400" />
                         {formatLogTime(log.created_at || log.log_date)}
-                      </span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                        {log.team_name || (log.teams && log.teams.name) || 'Tổ SX'}
                       </span>
                     </div>
                     <div className="text-right whitespace-nowrap">
@@ -731,6 +695,11 @@ export default function RealtimeFeed() {
                       <Package className="w-3.5 h-3.5 text-slate-400 mr-1.5 mt-0.5 flex-shrink-0" />
                       <div className="leading-tight">
                         <span className="font-medium text-slate-800">{log.product_name || `Mã #${log.product_id}`}</span>
+                        {log.operation && (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 font-semibold">
+                            {log.operation}
+                          </span>
+                        )}
                         {log.customer && (
                           <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-normal">
                             {log.customer}
@@ -804,12 +773,12 @@ export default function RealtimeFeed() {
                     {editingLog.employee_name || editingLog.employees?.full_name}
                   </span>
                 </div>
-                <div>
-                  <span className="text-slate-500">Tổ sản xuất:</span>{' '}
-                  <span className="font-medium text-blue-700">
-                    {editingLog.team_name || editingLog.teams?.name}
-                  </span>
-                </div>
+                {editingLog.operation && (
+                  <div>
+                    <span className="text-slate-500">Công đoạn:</span>{' '}
+                    <span className="font-medium text-violet-700">{editingLog.operation}</span>
+                  </div>
+                )}
                 <div>
                   <span className="text-slate-500">Sản phẩm:</span>{' '}
                   <span className="font-medium text-slate-700">

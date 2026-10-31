@@ -58,7 +58,7 @@ export function validateNewAccount(input = {}, existingAccounts = []) {
   }
   if (!fullName) errors.full_name = 'Vui lòng nhập họ tên';
   if (!role) errors.role = 'Vui lòng chọn vai trò';
-  if (role === 'leader' && !teamId) errors.team_id = 'Tổ trưởng bắt buộc phải thuộc một tổ';
+  // Không còn khái niệm tổ: team_id là tuỳ chọn (có thể null)
   const pwError = validatePassword(input.password);
   if (pwError) errors.password = pwError;
 
@@ -76,14 +76,13 @@ export function validateNewAccount(input = {}, existingAccounts = []) {
 }
 
 /**
- * Kiểm tra chỉnh sửa tài khoản (họ tên, tổ, mật khẩu mới tuỳ chọn).
+ * Kiểm tra chỉnh sửa tài khoản (họ tên, mật khẩu mới tuỳ chọn; tổ không bắt buộc).
  */
 export function validateAccountUpdate(input = {}, account = {}) {
   const errors = {};
   const fullName = String(input.full_name ?? '').trim();
   const teamId = input.team_id ? String(input.team_id) : null;
   if (!fullName) errors.full_name = 'Vui lòng nhập họ tên';
-  if (account.role === 'leader' && !teamId) errors.team_id = 'Tổ trưởng bắt buộc phải thuộc một tổ';
   if (input.password) {
     const pwError = validatePassword(input.password);
     if (pwError) errors.password = pwError;

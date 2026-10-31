@@ -77,7 +77,9 @@ async function run() {
   assert.strictEqual(v.valid, false);
   assert.ok(v.errors.username, 'duplicate username (case-insensitive) rejected');
   v = validateNewAccount({ username: 'to2', full_name: 'Tổ 2', role: 'leader', team_id: '', password: '123456' }, existing);
-  assert.ok(v.errors.team_id, 'leader requires team');
+  assert.strictEqual(v.errors.team_id, undefined, 'leader no longer requires team');
+  assert.strictEqual(v.valid, true);
+  assert.strictEqual(v.sanitized.team_id, null);
   v = validateNewAccount({ username: 'to2', full_name: 'Tổ 2', role: 'leader', team_id: 't2', password: '123' }, existing);
   assert.ok(v.errors.password, 'password >= 6 chars');
   v = validateNewAccount({ username: 'to2', full_name: '', role: 'leader', team_id: 't2', password: '123456' }, existing);
@@ -92,7 +94,7 @@ async function run() {
   assert.strictEqual(v.sanitized.team_id, null, 'admin has no team');
   const u = validateAccountUpdate({ full_name: '', team_id: 't1' }, existing[1]);
   assert.ok(u.errors.full_name);
-  assert.strictEqual(validateAccountUpdate({ full_name: 'Mới', team_id: '' }, existing[1]).errors.team_id !== undefined, true);
+  assert.strictEqual(validateAccountUpdate({ full_name: 'Mới', team_id: '' }, existing[1]).valid, true, 'team optional on update');
   assert.strictEqual(validateAccountUpdate({ full_name: 'Mới', team_id: 't2', password: '12' }, existing[1]).errors.password !== undefined, true);
   assert.strictEqual(validateAccountUpdate({ full_name: 'Mới', team_id: 't2' }, existing[1]).valid, true);
 
@@ -152,11 +154,10 @@ async function run() {
     /6/,
     'short password'
   );
-  await expectReject(
-    () => createAccount({ username: 'leader_no_team', password: '123456', full_name: 'Y', role: 'leader' }),
-    /tổ/i,
-    'leader needs team'
-  );
+  const noTeamLeader = await createAccount({ username: 'leader_no_team', password: '123456', full_name: 'Y', role: 'leader' });
+  assert.ok(noTeamLeader.id, 'leader without team is allowed');
+  assert.strictEqual(noTeamLeader.team_id, null);
+  await deleteAccount(noTeamLeader.id);
 
   const leaderLogin = await authenticateAccount('totruong_moi', 'abc12345');
   assert.ok(leaderLogin);
@@ -251,7 +252,7 @@ async function run() {
   assert.ok(fs.existsSync(path.join(root, 'src/components/admin/AccountManager.jsx')));
   const nav = read('src/components/Navbar.jsx');
   assert.ok(!nav.includes('Chuyển Vai Trò') && !nav.includes('Demo Mode') && !nav.includes('switchDemoRole'));
-  for (const label of ['Danh Mục Sản Phẩm', 'Giám Sát', 'Báo Cáo', 'Nhân Viên', 'Tài Khoản', 'Nhập Sản Lượng', 'Lịch Sử Của Tổ', 'Đổi mật khẩu', 'Đăng xuất', 'Phân Xưởng Hoàn Thiện']) {
+  for (const label of ['Danh Mục Sản Phẩm', 'Giám Sát', 'Báo Cáo', 'Nhân Viên', 'Tài Khoản', 'Nhập Sản Lượng', 'Lịch Sử Nhập Liệu', 'Đổi mật khẩu', 'Đăng xuất', 'Phân Xưởng Hoàn Thiện']) {
     assert.ok(nav.includes(label), `Navbar must include "${label}"`);
   }
   const login = read('src/components/LoginModal.jsx');

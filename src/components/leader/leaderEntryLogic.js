@@ -14,6 +14,7 @@ export function createEmptyRow() {
     product_id: '',
     quantity: '',
     duration_hours: '',
+    operation: '',
     notes: ''
   };
 }
@@ -41,14 +42,9 @@ export function filterActiveProducts(products = []) {
  * @returns {Array<Object>}
  */
 export function filterTeamEmployees(employees = [], teamId = null, includeOtherTeams = false) {
+  // Không còn phân tổ: trả về toàn bộ nhân viên đang hoạt động (giữ tham số để tương thích)
   if (!Array.isArray(employees)) return [];
-  const mappedTeamId = DEMO_TEAM_MAP[teamId] || teamId;
-  return employees.filter((emp) => {
-    if (!emp || emp.is_active === false) return false;
-    if (includeOtherTeams) return true;
-    if (!teamId) return true;
-    return emp.team_id === teamId || emp.team_id === mappedTeamId;
-  });
+  return employees.filter((emp) => Boolean(emp) && emp.is_active !== false);
 }
 
 /**
@@ -56,11 +52,13 @@ export function filterTeamEmployees(employees = [], teamId = null, includeOtherT
  * - Bắt buộc chọn nhân viên
  * - Cần ít nhất 1 dòng sản phẩm
  * - Mỗi dòng: Bắt buộc chọn sản phẩm, số lượng > 0, thời gian > 0
- * - Không cho phép chọn trùng sản phẩm trong cùng 1 lần nhập
+ * - Không cho phép chọn trùng (sản phẩm + công đoạn) trong cùng 1 lần nhập
+ * - Nếu truyền danh sách products và sản phẩm có công đoạn: bắt buộc chọn công đoạn
  * @param {Object} formData
+ * @param {Array<Object>} [products] Danh sách sản phẩm (để kiểm tra công đoạn bắt buộc)
  * @returns {{ isValid: boolean, errors: Object, errorMessages: Array<string> }}
  */
-export function validateEntryForm(formData) {
+export function validateEntryForm(formData, products = []) {
   const errors = {
     employee_id: '',
     rows: {},
@@ -91,30 +89,45 @@ export function validateEntryForm(formData) {
   }
 
   // 2. Kiểm tra trùng lặp sản phẩm giữa các dòng
-  const seenProducts = new Map();
-  rows.forEach((row, idx) => {
+  // Khóa trùng = mã SP + công đoạn: cùng SP khác công đoạn vẫn hợp lệ
+  const rowKey = (row) => {
     const pid = row?.product_id ? String(row.product_id).trim() : '';
-    if (pid) {
-      if (!seenProducts.has(pid)) {
-        seenProducts.set(pid, []);
+    const op = row?.operation ? String(row.operation).trim() : '';
+    return pid ? `${pid}::${op}` : '';
+  };
+
+  const seenKeys = new Map();
+  rows.forEach((row, idx) => {
+    const key = rowKey(row);
+    if (key) {
+      if (!seenKeys.has(key)) {
+        seenKeys.set(key, []);
       }
-      seenProducts.get(pid).push(idx);
+      seenKeys.get(key).push(idx);
     }
   });
 
+  const duplicateKeys = new Set();
   const duplicatePids = [];
-  seenProducts.forEach((indices, pid) => {
+  seenKeys.forEach((indices, key) => {
     if (indices.length > 1) {
-      duplicatePids.push(pid);
+      duplicateKeys.add(key);
+      const pid = key.split('::')[0];
+      const op = key.slice(pid.length + 2);
+      if (!duplicatePids.includes(pid)) duplicatePids.push(pid);
+      errorMessages.push(
+        op
+          ? `Sản phẩm mã #${pid} (công đoạn ${op}) bị chọn trùng lặp ở nhiều dòng`
+          : `Sản phẩm mã #${pid} bị chọn trùng lặp ở nhiều dòng`
+      );
     }
   });
 
   if (duplicatePids.length > 0) {
     errors.duplicateProductIds = duplicatePids;
-    duplicatePids.forEach((pid) => {
-      errorMessages.push(`Sản phẩm mã #${pid} bị chọn trùng lặp ở nhiều dòng`);
-    });
   }
+
+  const productList = Array.isArray(products) ? products : [];
 
   // 3. Kiểm tra chi tiết từng dòng
   rows.forEach((row, index) => {
@@ -124,8 +137,18 @@ export function validateEntryForm(formData) {
     if (!pid) {
       rowErrors.product_id = 'Vui lòng chọn sản phẩm';
       errorMessages.push(`Dòng ${index + 1}: Vui lòng chọn sản phẩm`);
-    } else if (duplicatePids.includes(pid)) {
-      rowErrors.product_id = 'Sản phẩm này bị trùng lặp với dòng khác';
+    } else {
+      if (duplicateKeys.has(rowKey(row))) {
+        rowErrors.product_id = 'Sản phẩm này bị trùng lặp với dòng khác';
+      }
+
+      // Sản phẩm có công đoạn thì bắt buộc chọn 1 công đoạn
+      const product = productList.find((p) => p && String(p.id) === pid);
+      const hasOperations = Array.isArray(product?.operations) && product.operations.length > 0;
+      if (hasOperations && !(row?.operation && String(row.operation).trim())) {
+        rowErrors.operation = 'Vui lòng chọn công đoạn';
+        errorMessages.push(`Dòng ${index + 1}: Vui lòng chọn công đoạn`);
+      }
     }
 
     // Kiểm tra Số lượng (> 0)
@@ -196,6 +219,7 @@ export function buildBatchPayload(formData = {}, teamId = null, userId = null) {
     log_date,
     quantity: Number(row.quantity) || 0,
     duration_hours: Number(row.duration_hours) || 0,
+    operation: typeof row.operation === 'string' ? row.operation.trim() : '',
     notes: typeof row.notes === 'string' ? row.notes.trim() : ''
   }));
 }

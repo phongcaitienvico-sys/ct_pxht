@@ -3,6 +3,8 @@
  * Supports searching, filtering, bulk toggles, reset shift, pagination, and validation.
  */
 
+export const MAX_OPERATIONS = 10;
+
 /**
  * Remove Vietnamese accents / diacritics and normalize search string
  */
@@ -82,8 +84,10 @@ export function filterProducts(products = [], { searchTerm = '', customerFilter 
       const idNorm = normalizeSearchText(p.id);
       const nameNorm = normalizeSearchText(p.name);
       const custNorm = normalizeSearchText(p.customer);
+      const opsNorm = normalizeSearchText(Array.isArray(p.operations) ? p.operations.join(' ') : '');
 
       const matchesQuery =
+        opsNorm.includes(query) ||
         idNorm.includes(query) ||
         nameNorm.includes(query) ||
         custNorm.includes(query);
@@ -256,6 +260,17 @@ export function validateProductInput(productData = {}) {
     }
   }
 
+  // Công đoạn: nhận mảng hoặc chuỗi phân tách bằng xuống dòng / dấu phẩy / chấm phẩy
+  const rawOps = Array.isArray(productData?.operations)
+    ? productData.operations
+    : typeof productData?.operations === 'string'
+    ? productData.operations.split(/[\n,;]+/)
+    : [];
+  const operations = rawOps.map((v) => String(v ?? '').trim()).filter(Boolean);
+  if (operations.length > MAX_OPERATIONS) {
+    errors.operations = `Tối đa ${MAX_OPERATIONS} công đoạn`;
+  }
+
   const generatedId = rawId || `SP_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   const sanitized = {
@@ -265,6 +280,7 @@ export function validateProductInput(productData = {}) {
     order_quantity: orderQty,
     blank_quantity: blankQty,
     status: rawStatus || 'Sx',
+    operations: operations.slice(0, MAX_OPERATIONS),
     is_active_today: Boolean(productData?.is_active_today)
   };
 

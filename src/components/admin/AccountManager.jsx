@@ -10,9 +10,7 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  ShieldCheck,
-  Building2,
-  Check
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import {
@@ -20,10 +18,7 @@ import {
   getAccounts,
   createAccount,
   updateAccount,
-  deleteAccount,
-  getTeams,
-  createTeam,
-  updateTeam
+  deleteAccount
 } from '../../lib/supabase.js';
 import {
   MIN_PASSWORD_LENGTH,
@@ -32,8 +27,7 @@ import {
   validatePassword,
   canDeleteAccount,
   canToggleActive,
-  filterAccounts,
-  roleLabel
+  filterAccounts
 } from './accountManagerLogic.js';
 
 const inputCls =
@@ -69,6 +63,8 @@ function Field({ label, error, children }) {
   );
 }
 
+const roleLabel = (role) => (role === 'admin' ? 'Quản trị' : 'Người nhập liệu');
+
 function RoleBadge({ role }) {
   return role === 'admin' ? (
     <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
@@ -88,7 +84,6 @@ export default function AccountManager() {
   // Mật khẩu quản trị chỉ giữ trong bộ nhớ component (chế độ Supabase)
   const [adminPassword, setAdminPassword] = useState(null);
   const [accounts, setAccounts] = useState([]);
-  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState(null);
@@ -106,18 +101,12 @@ export default function AccountManager() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const teamName = useCallback(
-    (id) => teams.find((t) => t.id === id)?.name || (id ? '—' : '—'),
-    [teams]
-  );
-
   const reload = useCallback(
     async (creds = admin) => {
       setLoading(true);
       try {
-        const [accs, tms] = await Promise.all([getAccounts(creds), getTeams()]);
+        const accs = await getAccounts(creds);
         setAccounts(accs);
-        setTeams(tms);
         return true;
       } catch (err) {
         notify('error', err.message || 'Không tải được dữ liệu');
@@ -132,7 +121,6 @@ export default function AccountManager() {
   useEffect(() => {
     if (needsAdminPassword) {
       setLoading(false);
-      getTeams().then(setTeams).catch(() => {});
       return;
     }
     reload();
@@ -164,7 +152,7 @@ export default function AccountManager() {
             <ShieldCheck className="w-5 h-5 text-blue-600" />
             Quản lý tài khoản
           </h2>
-          <p className="text-sm text-slate-500">Tạo tài khoản quản trị / tổ trưởng, đặt lại mật khẩu, khóa hoặc xóa tài khoản.</p>
+          <p className="text-sm text-slate-500">Tạo tài khoản quản trị / người nhập liệu, đặt lại mật khẩu, khóa hoặc xóa tài khoản.</p>
         </div>
         <button type="button" className={btnPrimary} onClick={() => setModal({ type: 'create' })} disabled={needsAdminPassword}>
           <Plus className="w-4 h-4" /> Thêm tài khoản
@@ -223,7 +211,6 @@ export default function AccountManager() {
                   <th className="py-3 px-4">Tên đăng nhập</th>
                   <th className="py-3 px-4">Họ tên</th>
                   <th className="py-3 px-4">Vai trò</th>
-                  <th className="py-3 px-4">Tổ</th>
                   <th className="py-3 px-4">Trạng thái</th>
                   <th className="py-3 px-4 text-right">Thao tác</th>
                 </tr>
@@ -231,12 +218,12 @@ export default function AccountManager() {
               <tbody className="divide-y divide-slate-100">
                 {loading && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500">Đang tải...</td>
+                    <td colSpan={5} className="py-8 text-center text-slate-500">Đang tải...</td>
                   </tr>
                 )}
                 {!loading && visible.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500">Không có tài khoản nào.</td>
+                    <td colSpan={5} className="py-8 text-center text-slate-500">Không có tài khoản nào.</td>
                   </tr>
                 )}
                 {!loading &&
@@ -251,7 +238,6 @@ export default function AccountManager() {
                         </td>
                         <td className="py-3 px-4 font-medium text-slate-900">{acc.full_name}</td>
                         <td className="py-3 px-4"><RoleBadge role={acc.role} /></td>
-                        <td className="py-3 px-4 text-slate-600">{acc.role === 'leader' ? teamName(acc.team_id) : '—'}</td>
                         <td className="py-3 px-4">
                           <span
                             className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -324,11 +310,6 @@ export default function AccountManager() {
                         <div className="text-sm font-semibold text-slate-800 mt-0.5">{acc.full_name}</div>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <RoleBadge role={acc.role} />
-                          {acc.role === 'leader' && (
-                            <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                              {teamName(acc.team_id)}
-                            </span>
-                          )}
                         </div>
                       </div>
 
@@ -392,11 +373,8 @@ export default function AccountManager() {
         </div>
       )}
 
-      <TeamSection teams={teams} onChanged={() => getTeams().then(setTeams)} notify={notify} />
-
       {modal?.type === 'create' && (
         <AccountFormModal
-          teams={teams}
           accounts={accounts}
           busy={busy}
           onClose={() => setModal(null)}
@@ -406,7 +384,6 @@ export default function AccountManager() {
       {modal?.type === 'edit' && (
         <AccountFormModal
           account={modal.account}
-          teams={teams}
           accounts={accounts}
           busy={busy}
           onClose={() => setModal(null)}
@@ -472,7 +449,7 @@ function AdminPasswordPrompt({ username, onConfirm }) {
   );
 }
 
-function AccountFormModal({ account, teams, accounts, busy, onClose, onSubmit }) {
+function AccountFormModal({ account, accounts, busy, onClose, onSubmit }) {
   const isEdit = Boolean(account);
   const [form, setForm] = useState({
     username: account?.username || '',
@@ -508,20 +485,10 @@ function AccountFormModal({ account, teams, accounts, busy, onClose, onSubmit })
         </Field>
         <Field label="Vai trò" error={errors.role}>
           <select className={inputCls} value={form.role} disabled={isEdit} onChange={(e) => set('role', e.target.value)}>
-            <option value="leader">Tổ trưởng</option>
+            <option value="leader">Người nhập liệu</option>
             <option value="admin">Quản trị</option>
           </select>
         </Field>
-        {form.role === 'leader' && (
-          <Field label="Tổ" error={errors.team_id}>
-            <select className={inputCls} value={form.team_id} onChange={(e) => set('team_id', e.target.value)}>
-              <option value="">— Chọn tổ —</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </Field>
-        )}
         <Field label={isEdit ? `Mật khẩu mới (bỏ trống nếu không đổi)` : `Mật khẩu (tối thiểu ${MIN_PASSWORD_LENGTH} ký tự)`} error={errors.password}>
           <input type="password" autoComplete="new-password" className={inputCls} value={form.password} onChange={(e) => set('password', e.target.value)} />
         </Field>
@@ -558,81 +525,5 @@ function ResetPasswordModal({ account, busy, onClose, onSubmit }) {
         </div>
       </form>
     </Modal>
-  );
-}
-
-function TeamSection({ teams, onChanged, notify }) {
-  const [newName, setNewName] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editName, setEditName] = useState('');
-
-  const add = async (e) => {
-    e.preventDefault();
-    try {
-      await createTeam(newName);
-      setNewName('');
-      notify('success', 'Đã thêm tổ mới');
-      onChanged();
-    } catch (err) {
-      notify('error', err.message);
-    }
-  };
-
-  const save = async (id) => {
-    try {
-      await updateTeam(id, { name: editName });
-      setEditingId(null);
-      notify('success', 'Đã đổi tên tổ');
-      onChanged();
-    } catch (err) {
-      notify('error', err.message);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-        <Building2 className="w-4 h-4 text-slate-500" /> Quản lý tổ
-      </h3>
-      <form onSubmit={add} className="flex gap-2 max-w-md">
-        <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Tên tổ mới, ví dụ: Tổ 3 - Hoàn thiện" />
-        <button type="submit" className={btnPrimary} disabled={!newName.trim()}>
-          <Plus className="w-4 h-4" /> Thêm
-        </button>
-      </form>
-      <ul className="divide-y divide-slate-100 border border-slate-100 rounded-xl">
-        {teams.map((t) => (
-          <li key={t.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-            {editingId === t.id ? (
-              <>
-                <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
-                <button type="button" className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" onClick={() => save(t.id)} title="Lưu">
-                  <Check className="w-4 h-4" />
-                </button>
-                <button type="button" className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg" onClick={() => setEditingId(null)} title="Hủy">
-                  <X className="w-4 h-4" />
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="text-slate-800">{t.name}</span>
-                <button
-                  type="button"
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                  title="Đổi tên tổ"
-                  onClick={() => {
-                    setEditingId(t.id);
-                    setEditName(t.name);
-                  }}
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-              </>
-            )}
-          </li>
-        ))}
-        {teams.length === 0 && <li className="px-3 py-3 text-sm text-slate-500">Chưa có tổ nào.</li>}
-      </ul>
-    </div>
   );
 }

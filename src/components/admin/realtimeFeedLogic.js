@@ -163,8 +163,10 @@ export function filterLogs(logs = [], { teamId = 'all', searchTerm = '', date = 
       const prodId = normalizeSearchText(log.product_id || (log.products && log.products.id) || '');
       const teamName = normalizeSearchText(log.team_name || (log.teams && log.teams.name) || '');
       const notes = normalizeSearchText(log.notes || '');
+      const operation = normalizeSearchText(log.operation || '');
 
       const matches =
+        operation.includes(query) ||
         empName.includes(query) ||
         empCode.includes(query) ||
         prodName.includes(query) ||

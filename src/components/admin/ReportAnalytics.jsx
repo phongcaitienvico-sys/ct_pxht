@@ -8,7 +8,6 @@ import {
   TrendingUp,
   Download,
   Search,
-  Filter,
   FileSpreadsheet,
   CheckCircle2,
   AlertTriangle,
@@ -20,13 +19,11 @@ import {
   FileText,
   Info,
   X,
-  ChevronRight,
-  Building2
+  ChevronRight
 } from 'lucide-react';
 
 import {
   getProductionLogs,
-  getTeams,
   getEmployees,
   getProducts
 } from '../../lib/supabase.js';
@@ -39,6 +36,7 @@ import {
   calculateAnalyticsKPI,
   groupLogsByDay,
   groupLogsByEmployeeSummary,
+  groupLogsByOperation,
   formatDateVN,
   formatFullDateVN,
   formatNumber
@@ -47,7 +45,6 @@ import {
 export default function ReportAnalytics() {
   // Master data & logs
   const [logs, setLogs] = useState([]);
-  const [teams, setTeams] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +57,6 @@ export default function ReportAnalytics() {
   const [endDate, setEndDate] = useState(() => getDatePresetRange('this_month').endDate);
 
   // Filters
-  const [selectedTeamId, setSelectedTeamId] = useState('all');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -78,15 +74,13 @@ export default function ReportAnalytics() {
       if (!isSilent) setLoading(true);
       else setRefreshing(true);
 
-      const [logsData, teamsData, employeesData, productsData] = await Promise.all([
+      const [logsData, employeesData, productsData] = await Promise.all([
         getProductionLogs(),
-        getTeams(),
         getEmployees(),
         getProducts()
       ]);
 
       setLogs(logsData || []);
-      setTeams(teamsData || []);
       setEmployees(employeesData || []);
       setProducts(productsData || []);
     } catch (err) {
@@ -127,18 +121,9 @@ export default function ReportAnalytics() {
     setActivePreset('this_month');
     setStartDate(range.startDate);
     setEndDate(range.endDate);
-    setSelectedTeamId('all');
     setSelectedEmployeeId('all');
     setSearchQuery('');
   };
-
-  // Filter employees available based on selected team
-  const filteredEmployeesList = useMemo(() => {
-    if (selectedTeamId === 'all') {
-      return employees;
-    }
-    return employees.filter((emp) => emp.team_id === selectedTeamId);
-  }, [employees, selectedTeamId]);
 
   // Selected Employee Details
   const currentSelectedEmployee = useMemo(() => {
@@ -151,11 +136,10 @@ export default function ReportAnalytics() {
     return filterLogsByCriteria(logs, {
       startDate,
       endDate,
-      teamId: selectedTeamId,
       employeeId: selectedEmployeeId,
       search: searchQuery
     });
-  }, [logs, startDate, endDate, selectedTeamId, selectedEmployeeId, searchQuery]);
+  }, [logs, startDate, endDate, selectedEmployeeId, searchQuery]);
 
   // Calculated KPI summary metrics
   const kpi = useMemo(() => {
@@ -170,6 +154,11 @@ export default function ReportAnalytics() {
   // Employee summaries table (Used when "All employees" is selected)
   const employeeSummaries = useMemo(() => {
     return groupLogsByEmployeeSummary(filteredLogs);
+  }, [filteredLogs]);
+
+  // Operation (công đoạn) summaries
+  const operationSummaries = useMemo(() => {
+    return groupLogsByOperation(filteredLogs);
   }, [filteredLogs]);
 
   // Export to Excel handler
@@ -291,7 +280,7 @@ export default function ReportAnalytics() {
                 );
               })}
 
-              {(activePreset === 'custom' || selectedEmployeeId !== 'all' || selectedTeamId !== 'all' || searchQuery) && (
+              {(activePreset === 'custom' || selectedEmployeeId !== 'all' || searchQuery) && (
                 <button
                   onClick={handleResetFilters}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
@@ -305,7 +294,7 @@ export default function ReportAnalytics() {
           </div>
 
           {/* Form Filter Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* Start Date */}
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -332,39 +321,6 @@ export default function ReportAnalytics() {
               />
             </div>
 
-            {/* Team Dropdown */}
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Tổ sản xuất:
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedTeamId}
-                  onChange={(e) => {
-                    setSelectedTeamId(e.target.value);
-                    // Reset selected employee if not in newly selected team
-                    if (e.target.value !== 'all' && selectedEmployeeId !== 'all') {
-                      const emp = employees.find((x) => x.id === selectedEmployeeId);
-                      if (emp && emp.team_id !== e.target.value) {
-                        setSelectedEmployeeId('all');
-                      }
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-medium appearance-none"
-                >
-                  <option value="all">Tất cả các tổ ({teams.length})</option>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
-                  <Filter className="w-3.5 h-3.5" />
-                </div>
-              </div>
-            </div>
-
             {/* Employee Dropdown */}
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -377,7 +333,7 @@ export default function ReportAnalytics() {
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-medium appearance-none"
                 >
                   <option value="all">👥 Tất cả nhân viên</option>
-                  {filteredEmployeesList.map((emp) => (
+                  {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.full_name} ({emp.code})
                     </option>
@@ -508,6 +464,44 @@ export default function ReportAnalytics() {
         </div>
       </div>
 
+      {/* Operation (Công đoạn) Summary */}
+      {!loading && filteredLogs.length > 0 && operationSummaries.length > 0 && (
+        <div className="max-w-7xl mx-auto mb-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-violet-600" />
+                <span>Theo công đoạn</span>
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="px-5 py-3">Công đoạn</th>
+                    <th className="px-5 py-3 text-right">Số lượng</th>
+                    <th className="px-5 py-3 text-right">Số giờ</th>
+                    <th className="px-5 py-3 text-right">Số lượt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {operationSummaries.map((op, idx) => (
+                    <tr key={op.operation || `none-${idx}`} className="hover:bg-slate-50/70 transition">
+                      <td className="px-5 py-2.5 font-semibold text-slate-900">
+                        {op.operation || <span className="italic font-normal text-slate-400">Chưa gán công đoạn</span>}
+                      </td>
+                      <td className="px-5 py-2.5 text-right font-bold text-slate-900">{formatNumber(op.totalQuantity)}</td>
+                      <td className="px-5 py-2.5 text-right text-slate-600 font-mono text-xs">{op.totalHours} h</td>
+                      <td className="px-5 py-2.5 text-right text-slate-500 font-mono text-xs">{op.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main View Area: Day-by-Day (Single Emp) vs Overview (All Emps) */}
       <div className="max-w-7xl mx-auto">
         {loading ? (
@@ -558,9 +552,6 @@ export default function ReportAnalytics() {
                     </span>
                   </div>
                   <p className="text-xs text-blue-200 mt-1 flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5" />
-                    <span>{currentSelectedEmployee?.team_name || (teams.find(t => t.id === currentSelectedEmployee?.team_id)?.name) || 'Tổ sản xuất'}</span>
-                    <span>•</span>
                     <span>Kỳ báo cáo: {formatDateVN(startDate)} - {formatDateVN(endDate)}</span>
                   </p>
                 </div>
@@ -699,7 +690,6 @@ export default function ReportAnalytics() {
                     <th className="px-6 py-3.5">STT</th>
                     <th className="px-6 py-3.5">Mã NV</th>
                     <th className="px-6 py-3.5">Họ và tên</th>
-                    <th className="px-6 py-3.5">Tổ / Bộ phận</th>
                     <th className="px-6 py-3.5 text-center">Số ngày làm</th>
                     <th className="px-6 py-3.5 text-center">Số lượt ghi</th>
                     <th className="px-6 py-3.5 text-right">Tổng sản phẩm</th>
@@ -729,9 +719,6 @@ export default function ReportAnalytics() {
                       </td>
                       <td className="px-6 py-4 font-semibold text-slate-900 group-hover:text-blue-700 transition">
                         {emp.employeeName}
-                      </td>
-                      <td className="px-6 py-4 text-xs text-slate-600">
-                        {emp.teamName || '—'}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
@@ -798,7 +785,6 @@ export default function ReportAnalytics() {
                         </span>
                       </div>
                       <div className="text-sm font-bold text-slate-900 mt-1">{emp.employeeName}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{emp.teamName || '—'}</div>
                     </div>
 
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">

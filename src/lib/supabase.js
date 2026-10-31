@@ -76,6 +76,25 @@ function generateId() {
   });
 }
 
+export const MAX_OPERATIONS = 10;
+
+/**
+ * Chuẩn hóa danh sách công đoạn: mảng chuỗi đã trim, bỏ rỗng, tối đa 10 mục
+ */
+function normalizeOperations(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => String(v ?? '').trim())
+    .filter(Boolean)
+    .slice(0, MAX_OPERATIONS);
+}
+
+// Đảm bảo sản phẩm luôn có mảng operations (mặc định [])
+function withOperations(product) {
+  if (!product) return product;
+  return { ...product, operations: normalizeOperations(product.operations) };
+}
+
 // Realtime listeners for Demo Mode
 const demoSubscribers = new Set();
 
@@ -98,7 +117,7 @@ export async function resetDemoData() {
   setStore(KEYS.EMPLOYEES, seedEmployees);
   const dynamicLogs = typeof getDynamicSeedLogs === 'function' ? getDynamicSeedLogs() : seedLogs;
   setStore(KEYS.LOGS, dynamicLogs);
-  setStore('pxht_demo_version', 'pxht-seed-v4-today');
+  setStore('pxht_demo_version', DEMO_DATA_VERSION);
   return {
     products: seedProducts,
     teams: seedTeams,
@@ -110,7 +129,7 @@ export async function resetDemoData() {
 /**
  * Ensure demo store is initialized with seed data if empty
  */
-export const DEMO_DATA_VERSION = 'pxht-seed-v4-today';
+export const DEMO_DATA_VERSION = 'pxht-seed-v5-operations';
 
 export async function initDemoData() {
   const version = getStore('pxht_demo_version', null);
@@ -144,7 +163,7 @@ async function ensureDemoInitialized() {
 export async function getProducts() {
   if (isDemoMode()) {
     await ensureDemoInitialized();
-    return getStore(KEYS.PRODUCTS, []);
+    return getStore(KEYS.PRODUCTS, []).map(withOperations);
   }
 
   const { data, error } = await supabase
@@ -156,7 +175,7 @@ export async function getProducts() {
     console.error('getProducts error:', error);
     throw error;
   }
-  return data;
+  return (data || []).map(withOperations);
 }
 
 /**
@@ -258,6 +277,12 @@ export async function upsertProducts(productsArray) {
         order_quantity: Number(item.order_quantity) || 0,
         blank_quantity: Number(item.blank_quantity) || 0,
         status: item.status || 'Sx',
+        operations:
+          item.operations !== undefined
+            ? normalizeOperations(item.operations)
+            : existing
+            ? normalizeOperations(existing.operations)
+            : [],
         is_active_today:
           item.is_active_today !== undefined
             ? Boolean(item.is_active_today)
@@ -274,16 +299,21 @@ export async function upsertProducts(productsArray) {
     return productsArray.map((p) => productMap.get(String(p.id)));
   }
 
+  // Chuẩn hóa công đoạn (chỉ gửi khi có truyền vào để không ghi đè dữ liệu cũ)
+  const payload = productsArray.map((item) =>
+    item.operations !== undefined ? { ...item, operations: normalizeOperations(item.operations) } : item
+  );
+
   const { data, error } = await supabase
     .from('products')
-    .upsert(productsArray, { onConflict: 'id' })
+    .upsert(payload, { onConflict: 'id' })
     .select();
 
   if (error) {
     console.error('upsertProducts error:', error);
     throw error;
   }
-  return data;
+  return (data || []).map(withOperations);
 }
 
 /**
@@ -463,6 +493,7 @@ export async function submitProductionLogs(logsArray) {
         log_date,
         quantity,
         duration_hours,
+        operation: String(item.operation ?? '').trim(),
         created_at: item.created_at || now,
         employee_name: emp ? emp.full_name : '',
         employee_code: emp ? emp.code : '',
@@ -490,6 +521,7 @@ export async function submitProductionLogs(logsArray) {
     log_date: item.log_date || today,
     quantity: Number(item.quantity) || 0,
     duration_hours: Number(item.duration_hours) || 0,
+    operation: String(item.operation ?? '').trim(),
     created_at: item.created_at || now
   }));
 
@@ -608,6 +640,7 @@ export async function updateProductionLog(logId, updates) {
     const updated = { ...oldRecord, ...updates };
     if (updates.quantity !== undefined) updated.quantity = Number(updates.quantity);
     if (updates.duration_hours !== undefined) updated.duration_hours = Number(updates.duration_hours);
+    if (updates.operation !== undefined) updated.operation = String(updates.operation ?? '').trim();
 
     const emp = employees.find((e) => e.id === updated.employee_id);
     const prod = products.find((p) => String(p.id) === String(updated.product_id));
@@ -629,9 +662,12 @@ export async function updateProductionLog(logId, updates) {
     return updated;
   }
 
+  const payload = { ...updates };
+  if (payload.operation !== undefined) payload.operation = String(payload.operation ?? '').trim();
+
   const { data, error } = await supabase
     .from('production_logs')
-    .update(updates)
+    .update(payload)
     .eq('id', logId)
     .select('*, employees(*), products(*), teams(*)')
     .single();
@@ -961,8 +997,8 @@ export async function updateAccount(id, updates = {}, admin) {
       target.full_name = name;
     }
     if (updates.team_id !== undefined && target.role === 'leader') {
-      if (!updates.team_id) throw new Error('Tổ trưởng bắt buộc phải thuộc một tổ');
-      target.team_id = updates.team_id;
+      // Tổ không còn bắt buộc: cho phép để trống (null)
+      target.team_id = updates.team_id || null;
     }
     if (updates.is_active !== undefined) target.is_active = Boolean(updates.is_active);
     if (updates.password) {

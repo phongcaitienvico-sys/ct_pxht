@@ -205,14 +205,14 @@ async function runE2ETests() {
   const leader1TeamWorkers = filterTeamEmployees(allEmployeesList, effectiveTeamId, false);
   assert.strictEqual(
     leader1TeamWorkers.length,
-    3,
-    'Tổ Trưởng 1 phải nhìn thấy đúng 3 thợ của tổ mình mà không cần bật "Xem thợ tổ khác"'
+    allEmployeesList.filter((e) => e.is_active !== false).length,
+    'Không còn phân tổ: tổ trưởng thấy toàn bộ thợ đang hoạt động'
   );
 
   const workerNames = leader1TeamWorkers.map((w) => w.full_name || w.name);
   assert.ok(
     workerNames.includes('Trần Văn Hùng'),
-    'Danh sách thợ của Tổ 1 phải có Trần Văn Hùng'
+    'Danh sách thợ phải có Trần Văn Hùng'
   );
   assert.ok(
     workerNames.includes('Lê Văn Cường'),
@@ -271,11 +271,7 @@ async function runE2ETests() {
   assert.ok(appContent.includes('LeaderDailyLogs'), 'App.jsx must import LeaderDailyLogs');
   assert.ok(appContent.includes('LoginModal'), 'App.jsx must render the login screen');
   assert.ok(appContent.includes('AccountManager'), 'App.jsx must import AccountManager');
-  assert.ok(appContent.includes('DEMO_TEAM_MAP'), 'App.jsx must declare DEMO_TEAM_MAP');
-  assert.ok(
-    appContent.includes('teamId={effectiveTeamId}'),
-    'App.jsx must pass effectiveTeamId to LeaderEntryForm and LeaderDailyLogs'
-  );
+  // Không còn khái niệm tổ: App.jsx không bắt buộc truyền teamId nữa
   console.log('  ✔ App.jsx orchestrates all sub-modules for Admin and Leader');
 
   // 3. Verify static assets & favicon

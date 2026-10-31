@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS products (
   order_quantity INTEGER DEFAULT 0, -- Số lượng kế hoạch theo đơn
   blank_quantity INTEGER DEFAULT 0, -- Số lượng phôi
   status TEXT DEFAULT 'Sx', -- Trạng thái sản xuất: 'Sx', 'Tạm dừng', 'Hoàn thành'
+  operations JSONB NOT NULL DEFAULT '[]'::jsonb, -- Danh sách công đoạn (tối đa 10), ví dụ: ["Mài đậu","Sơn"]
   is_active_today BOOLEAN DEFAULT FALSE, -- Cờ kích hoạt làm hôm nay (Admin điều khiển)
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -37,11 +38,12 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS production_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   log_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  team_id UUID REFERENCES teams(id) ON DELETE RESTRICT,
+  team_id UUID REFERENCES teams(id) ON DELETE SET NULL, -- Không bắt buộc (không còn phân tổ)
   employee_id UUID REFERENCES employees(id) ON DELETE RESTRICT,
   product_id TEXT REFERENCES products(id) ON DELETE RESTRICT,
   quantity INTEGER NOT NULL CHECK (quantity > 0), -- Số lượng hoàn thành
   duration_hours NUMERIC(4, 2) NOT NULL CHECK (duration_hours >= 0), -- Số giờ làm việc (ví dụ: 2.5)
+  operation TEXT NOT NULL DEFAULT '', -- Công đoạn đã chọn ('' nếu không có)
   notes TEXT,
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -190,9 +192,10 @@ CREATE TABLE IF NOT EXISTS app_accounts (
   role TEXT NOT NULL CHECK (role IN ('admin', 'leader')),
   team_id UUID REFERENCES teams(id) ON DELETE RESTRICT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT leader_needs_team CHECK (role <> 'leader' OR team_id IS NOT NULL)
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
+-- Không còn bắt buộc tổ trưởng thuộc một tổ
+ALTER TABLE app_accounts DROP CONSTRAINT IF EXISTS leader_needs_team;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_app_accounts_username ON app_accounts (lower(username));
 
 ALTER TABLE app_accounts ENABLE ROW LEVEL SECURITY;
@@ -247,9 +250,6 @@ BEGIN
   PERFORM app_assert_admin(p_admin_username, p_admin_password);
   IF length(COALESCE(p_password, '')) < 6 THEN
     RAISE EXCEPTION 'Mật khẩu phải có ít nhất 6 ký tự';
-  END IF;
-  IF p_role = 'leader' AND p_team_id IS NULL THEN
-    RAISE EXCEPTION 'Tổ trưởng bắt buộc phải thuộc một tổ';
   END IF;
   IF EXISTS (SELECT 1 FROM app_accounts WHERE lower(username) = lower(p_username)) THEN
     RAISE EXCEPTION 'Tên đăng nhập đã tồn tại';
