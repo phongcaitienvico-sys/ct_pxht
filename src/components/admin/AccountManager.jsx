@@ -142,7 +142,10 @@ export default function AccountManager() {
     }
   };
 
-  const visible = useMemo(() => filterAccounts(accounts, search), [accounts, search]);
+  const visible = useMemo(
+    () => filterAccounts(accounts, search).filter((a) => String(a.username || '').trim().toLowerCase() !== 'admin'),
+    [accounts, search]
+  );
 
   return (
     <div className="space-y-6">

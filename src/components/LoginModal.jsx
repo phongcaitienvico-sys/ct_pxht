@@ -114,39 +114,6 @@ export default function LoginModal() {
             <LogIn className="w-4 h-4" />
             {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
-
-          {/* Hộp gợi ý tài khoản mẫu dùng thử */}
-          <div className="pt-2 border-t border-slate-100">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
-              Tài khoản mẫu dùng thử:
-            </p>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setUsername('admin');
-                  setPassword('admin123');
-                  setError('');
-                }}
-                className="p-2 text-left bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200 rounded-lg transition-colors group"
-              >
-                <div className="font-semibold text-slate-800 group-hover:text-blue-700">🖥️ Quản Đốc (PC)</div>
-                <div className="text-[11px] text-slate-500 font-mono mt-0.5">admin / admin123</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUsername('totruong1');
-                  setPassword('123456');
-                  setError('');
-                }}
-                className="p-2 text-left bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 rounded-lg transition-colors group"
-              >
-                <div className="font-semibold text-slate-800 group-hover:text-emerald-700">📱 Người nhập liệu (ĐT)</div>
-                <div className="text-[11px] text-slate-500 font-mono mt-0.5">totruong1 / 123456</div>
-              </button>
-            </div>
-          </div>
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-400">
