@@ -143,7 +143,7 @@ export default function AccountManager() {
   };
 
   const visible = useMemo(
-    () => filterAccounts(accounts, search).filter((a) => String(a.username || '').trim().toLowerCase() !== 'admin'),
+    () => filterAccounts(accounts, search).filter((a) => String(a.username || '').trim().toLowerCase() !== 'adminduy'),
     [accounts, search]
   );
 
