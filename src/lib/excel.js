@@ -98,6 +98,144 @@ const PRODUCT_FIELD_MAP = {
 };
 
 /**
+ * Chuẩn hóa tên công đoạn (bỏ tiền tố số thứ tự như "01- ", "02 - " nếu có)
+ */
+function cleanOperationName(raw) {
+  if (raw === undefined || raw === null) return '';
+  return String(raw).trim().replace(/^\d+\s*-\s*/, '').trim();
+}
+
+/**
+ * Kiểm tra và trích xuất danh mục sản phẩm đang sản xuất từ file tổng hợp PXHT_Sh.xlsx
+ * (Có sheet Data chứa bảng Đơn Hàng ở cột J..AP + bảng Phôi ở cột BD..BF, và/hoặc sheet Nhap_Sanluong)
+ */
+function tryParsePxhtMasterProducts(wb) {
+  const dataSheet = wb.Sheets['Data'];
+  const nslSheet = wb.Sheets['Nhap_Sanluong'];
+  if (!dataSheet && !nslSheet) return null;
+
+  const dataRows = dataSheet ? XLSX.utils.sheet_to_json(dataSheet, { header: 1, defval: '' }) : [];
+  const headerRow2 = dataRows[1] || [];
+  const isPxhtDataSheet =
+    normalizeColumnKey(headerRow2[9]) === 'iddonhang' &&
+    normalizeColumnKey(headerRow2[10]) === 'tensanpham';
+
+  if (!isPxhtDataSheet && !nslSheet) return null;
+
+  // 1. Cộng dồn số lượng Phôi theo Id sản phẩm từ cột BD..BF (index 55..57) của sheet Data
+  const phoiMap = new Map();
+  if (isPxhtDataSheet) {
+    for (let r = 3; r < dataRows.length; r++) {
+      const row = dataRows[r];
+      if (!row) continue;
+      const rawPid = row[55];
+      const rawPhoi = row[57];
+      if (rawPid !== '' && rawPid !== null && rawPid !== undefined) {
+        const pidKey = String(rawPid).trim();
+        const pVal = typeof rawPhoi === 'number' ? rawPhoi : Number(String(rawPhoi).replace(/,/g, '').trim());
+        if (pidKey && Number.isFinite(pVal) && pVal > 0) {
+          phoiMap.set(pidKey, (phoiMap.get(pidKey) || 0) + Math.round(pVal));
+        }
+      }
+    }
+  }
+
+  // 2. Tập hợp các mã đang nằm trong sheet Nhap_Sanluong (nếu có)
+  const nslMap = new Map();
+  if (nslSheet) {
+    const nslRows = XLSX.utils.sheet_to_json(nslSheet, { header: 1, defval: '' });
+    const nslHeader = nslRows[1] || [];
+    if (normalizeColumnKey(nslHeader[0]) === 'tensanpham' && normalizeColumnKey(nslHeader[5]) === 'id') {
+      for (let r = 3; r < nslRows.length; r++) {
+        const row = nslRows[r];
+        if (!row) continue;
+        const rawId = String(row[5] ?? '').trim();
+        const rawName = String(row[0] ?? '').trim();
+        if (!rawId || rawId.toLowerCase() === 'mẫu' || !rawName) continue;
+        const ops = [];
+        for (let c = 96; c < 106; c++) {
+          const opText = cleanOperationName(row[c]);
+          if (opText && ops.length < MAX_PRODUCT_OPERATIONS) ops.push(opText);
+        }
+        const qty = typeof row[2] === 'number' ? row[2] : Number(String(row[2]).replace(/,/g, '').trim()) || 0;
+        const phoi = typeof row[3] === 'number' ? row[3] : Number(String(row[3]).replace(/,/g, '').trim()) || 0;
+        nslMap.set(rawId, {
+          id: rawId,
+          name: rawName,
+          customer: String(row[1] ?? '').trim(),
+          order_quantity: Number.isFinite(qty) ? Math.round(qty) : 0,
+          blank_quantity: phoiMap.get(rawId) ?? (Number.isFinite(phoi) ? Math.round(phoi) : 0),
+          status: String(row[4] || 'Sx').trim() || 'Sx',
+          is_active_today: true,
+          operations: ops
+        });
+      }
+    }
+  }
+
+  // 3. Đọc bảng Đơn Hàng trong sheet Data (cột J..AP, index 9..41)
+  if (isPxhtDataSheet) {
+    const results = [];
+    const seenIds = new Set();
+
+    for (let r = 3; r < dataRows.length; r++) {
+      const row = dataRows[r];
+      if (!row) continue;
+      const rawId = String(row[9] ?? '').trim();
+      const rawName = String(row[10] ?? '').trim();
+      if (!rawId && !rawName) break;
+      if (!rawId || rawId === 'C1' || !rawName) continue;
+
+      const status = String(row[19] ?? '').trim();
+      const inNsl = nslMap.has(rawId);
+      // Chỉ lấy các mã đang sản xuất (status === 'Sx' hoặc có trong Nhap_Sanluong)
+      if (status !== 'Sx' && !inNsl) continue;
+
+      const ops = [];
+      for (let c = 32; c <= 41; c++) {
+        const opText = cleanOperationName(row[c]);
+        if (opText && ops.length < MAX_PRODUCT_OPERATIONS) {
+          ops.push(opText);
+        }
+      }
+      const nslItem = nslMap.get(rawId);
+      const finalOps = ops.length > 0 ? ops : (nslItem ? nslItem.operations : []);
+      const rawQty = row[14];
+      const parsedQty = typeof rawQty === 'number' ? rawQty : Number(String(rawQty).replace(/,/g, '').trim());
+      const orderQuantity = Number.isFinite(parsedQty) && parsedQty > 0
+        ? Math.round(parsedQty)
+        : (nslItem ? nslItem.order_quantity : 0);
+
+      results.push({
+        id: rawId,
+        name: rawName,
+        customer: String(row[11] ?? '').trim() || (nslItem ? nslItem.customer : ''),
+        order_quantity: orderQuantity,
+        blank_quantity: phoiMap.get(rawId) || (nslItem ? nslItem.blank_quantity : 0),
+        status: status || 'Sx',
+        is_active_today: inNsl,
+        operations: finalOps
+      });
+      seenIds.add(rawId);
+    }
+
+    for (const [id, item] of nslMap.entries()) {
+      if (!seenIds.has(id)) {
+        results.push(item);
+      }
+    }
+
+    if (results.length > 0) return results;
+  }
+
+  if (nslMap.size > 0) {
+    return Array.from(nslMap.values());
+  }
+
+  return null;
+}
+
+/**
  * Đọc file Excel danh mục sản phẩm
  * @param {ArrayBuffer|Uint8Array|Buffer|string} data
  * @returns {Array<Object>} Mảng sản phẩm chuẩn hóa
@@ -106,6 +244,12 @@ export function parseProductExcel(data) {
   const wb = readWorkbook(data);
   const firstSheetName = wb.SheetNames[0];
   if (!firstSheetName) return [];
+
+  // Hỗ trợ đọc trực tiếp file tổng hợp PXHT_Sh.xlsx (multi-sheet / multi-table)
+  const masterProducts = tryParsePxhtMasterProducts(wb);
+  if (masterProducts && masterProducts.length > 0) {
+    return masterProducts;
+  }
 
   const ws = wb.Sheets[firstSheetName];
   const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -199,11 +343,69 @@ export function parseProductExcel(data) {
 
 // Bảng ánh xạ các cột danh sách nhân viên
 const EMPLOYEE_FIELD_MAP = {
-  code: ['manv', 'manhanvien', 'code', 'employeecode', 'id', 'ma'],
+  code: ['manv', 'manhanvien', 'code', 'employeecode', 'id', 'ma', 'idnhanvien'],
   full_name: ['hovaten', 'hoten', 'fullname', 'name', 'tennv', 'tennhanvien', 'nhanvien', 'ten'],
   team_name: ['to', 'tosanxuat', 'bophan', 'tobophan', 'teamname', 'department', 'team', 'phongban'],
   is_active: ['isactive', 'hoatdong', 'trangthai', 'active']
 };
+
+/**
+ * Chuẩn hóa mã nhân viên từ dạng NV001 -> NV01 (giữ ít nhất 2 chữ số)
+ */
+export function normalizeEmployeeCode(rawCode) {
+  const trimmed = String(rawCode ?? '').trim().toUpperCase();
+  const match = /^NV0*(\d+)$/i.exec(trimmed);
+  if (match) {
+    const num = Number(match[1]);
+    if (Number.isFinite(num) && num > 0) {
+      return `NV${String(num).padStart(2, '0')}`;
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Kiểm tra và trích xuất danh sách nhân viên từ sheet Data của file tổng hợp PXHT_Sh.xlsx
+ */
+function tryParsePxhtMasterEmployees(wb) {
+  const dataSheet = wb.Sheets['Data'] || wb.Sheets[wb.SheetNames[0]];
+  if (!dataSheet) return null;
+
+  const rows = XLSX.utils.sheet_to_json(dataSheet, { header: 1, defval: '' });
+  const headerRow2 = rows[1] || [];
+  if (
+    normalizeColumnKey(headerRow2[0]) !== 'idnhanvien' ||
+    normalizeColumnKey(headerRow2[1]) !== 'hovaten'
+  ) {
+    return null;
+  }
+
+  const employees = [];
+  for (let r = 2; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const rawCode = String(row[0] ?? '').trim();
+    const rawFullName = String(row[1] ?? '').trim();
+    if (!rawCode && !rawFullName) break;
+    // Bỏ qua dòng ký hiệu cột C1..C4 và dòng ảo NV000 (Công Trung Bình)
+    if (
+      rawCode.toUpperCase() === 'C1' ||
+      /^NV0+$/i.test(rawCode) ||
+      normalizeColumnKey(rawFullName) === 'congtrungbinh'
+    ) {
+      continue;
+    }
+    employees.push({
+      id: generateId(),
+      code: normalizeEmployeeCode(rawCode),
+      full_name: rawFullName,
+      team_name: '',
+      is_active: true
+    });
+  }
+
+  return employees.length > 0 ? employees : null;
+}
 
 /**
  * Đọc file Excel danh sách nhân viên
@@ -214,6 +416,12 @@ export function parseEmployeeExcel(data) {
   const wb = readWorkbook(data);
   const firstSheetName = wb.SheetNames[0];
   if (!firstSheetName) return [];
+
+  // Hỗ trợ đọc trực tiếp bảng DANH SÁCH NHÂN VIÊN từ file PXHT_Sh.xlsx
+  const masterEmployees = tryParsePxhtMasterEmployees(wb);
+  if (masterEmployees && masterEmployees.length > 0) {
+    return masterEmployees;
+  }
 
   const ws = wb.Sheets[firstSheetName];
   const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });

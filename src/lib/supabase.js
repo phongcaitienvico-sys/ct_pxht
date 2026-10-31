@@ -591,33 +591,44 @@ export async function getProductionLogs(filter = {}) {
     return enriched;
   }
 
-  let query = supabase.from('production_logs').select('*, employees(*), products(*), teams(*)');
+  const PAGE_SIZE = 1000;
+  let allRows = [];
+  let from = 0;
 
-  if (filter.date) {
-    query = query.eq('log_date', filter.date);
-  }
-  if (filter.startDate) {
-    query = query.gte('log_date', filter.startDate);
-  }
-  if (filter.endDate) {
-    query = query.lte('log_date', filter.endDate);
-  }
-  if (filter.teamId) {
-    query = query.eq('team_id', filter.teamId);
-  }
-  if (filter.employeeId) {
-    query = query.eq('employee_id', filter.employeeId);
-  }
+  while (true) {
+    let query = supabase.from('production_logs').select('*, employees(*), products(*), teams(*)');
 
-  const { data, error } = await query
-    .order('log_date', { ascending: false })
-    .order('created_at', { ascending: false });
+    if (filter.date) {
+      query = query.eq('log_date', filter.date);
+    }
+    if (filter.startDate) {
+      query = query.gte('log_date', filter.startDate);
+    }
+    if (filter.endDate) {
+      query = query.lte('log_date', filter.endDate);
+    }
+    if (filter.teamId) {
+      query = query.eq('team_id', filter.teamId);
+    }
+    if (filter.employeeId) {
+      query = query.eq('employee_id', filter.employeeId);
+    }
 
-  if (error) {
-    console.error('getProductionLogs error:', error);
-    throw error;
+    const { data, error } = await query
+      .order('log_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('getProductionLogs error:', error);
+      throw error;
+    }
+    if (!data || data.length === 0) break;
+    allRows = allRows.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
-  return data;
+  return allRows;
 }
 
 /**
