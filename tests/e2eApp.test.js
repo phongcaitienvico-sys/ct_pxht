@@ -17,7 +17,7 @@ import {
 import { filterActiveProducts, filterTeamEmployees } from '../src/components/leader/leaderEntryLogic.js';
 import { loginLogic, clearAuthSession, DEMO_TEAM_MAP } from '../src/contexts/authLogic.js';
 import { createAccount, resetAccounts } from '../src/lib/supabase.js';
-import { calculateTodayKPI } from '../src/components/admin/realtimeFeedLogic.js';
+import { calculateTodayKPI, getTodayDateString } from '../src/components/admin/realtimeFeedLogic.js';
 import {
   filterLogsByCriteria,
   calculateAnalyticsKPI,
@@ -71,7 +71,7 @@ async function runE2ETests() {
   assert.ok(employees.length > 0, `Team ${targetTeam.name} should have employees`);
   const targetEmployee = employees[0];
 
-  const todayStr = '2026-10-30';
+  const todayStr = getTodayDateString();
   const newBatch = [
     {
       team_id: targetTeam.id,
