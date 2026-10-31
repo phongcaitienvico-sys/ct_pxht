@@ -516,7 +516,7 @@ export async function submitProductionLogs(logsArray) {
     return inserted;
   }
 
-  const formatted = logsArray.map((item) => ({
+  const formatted = logsArray.map(({ created_by, ...item }) => ({
     ...item,
     log_date: item.log_date || today,
     quantity: Number(item.quantity) || 0,

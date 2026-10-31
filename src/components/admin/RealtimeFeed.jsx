@@ -764,7 +764,7 @@ export default function RealtimeFeed() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmitEdit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmitEdit} noValidate className="p-6 space-y-4">
               {/* Thông tin cố định */}
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1">
                 <div>
@@ -817,7 +817,7 @@ export default function RealtimeFeed() {
                 </label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="0.1"
                   min="0.1"
                   max="24"
                   value={editFormData.duration_hours}

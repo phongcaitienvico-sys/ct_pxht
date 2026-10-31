@@ -336,7 +336,7 @@ export default function LeaderEntryForm({
             <p className="text-sm font-medium">Đang tải danh sách thợ và sản phẩm...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-6">
             {/* Warning if no active products enabled today */}
             {activeProducts.length === 0 && (
               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3">
@@ -644,7 +644,7 @@ export default function LeaderEntryForm({
                           <input
                             type="number"
                             min="0.1"
-                            step="0.5"
+                            step="0.1"
                             inputMode="decimal"
                             placeholder="0.0"
                             value={row.duration_hours}

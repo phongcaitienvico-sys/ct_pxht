@@ -8,7 +8,9 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS operations JSONB NOT NULL DEFAULT 
 ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS operation TEXT NOT NULL DEFAULT '';
 
 -- 2. Bo khai niem "to": production_logs.team_id khong bat buoc; to truong khong can thuoc to
+--    Dong thoi bo FK production_logs.created_by -> auth.users vi he thong dung bang app_accounts
 ALTER TABLE production_logs ALTER COLUMN team_id DROP NOT NULL;
+ALTER TABLE production_logs DROP CONSTRAINT IF EXISTS production_logs_created_by_fkey;
 ALTER TABLE app_accounts DROP CONSTRAINT IF EXISTS leader_needs_team;
 
 -- 3. Tao tai khoan: khong con yeu cau to truong phai co to
