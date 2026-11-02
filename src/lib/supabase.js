@@ -299,21 +299,43 @@ export async function upsertProducts(productsArray) {
     return productsArray.map((p) => productMap.get(String(p.id)));
   }
 
-  // Chuẩn hóa công đoạn (chỉ gửi khi có truyền vào để không ghi đè dữ liệu cũ)
-  const payload = productsArray.map((item) =>
-    item.operations !== undefined ? { ...item, operations: normalizeOperations(item.operations) } : item
-  );
-
-  const { data, error } = await supabase
-    .from('products')
-    .upsert(payload, { onConflict: 'id' })
-    .select();
-
-  if (error) {
-    console.error('upsertProducts error:', error);
-    throw error;
+  // Chuẩn hóa dữ liệu số nguyên, công đoạn và khử trùng lặp ID trong cùng 1 đợt import
+  const dedupedMap = new Map();
+  for (const item of productsArray) {
+    const id = String(item.id ?? '').trim();
+    if (!id) continue;
+    const row = {
+      ...item,
+      id,
+      order_quantity: Math.round(Number(item.order_quantity) || 0),
+      blank_quantity: Math.round(Number(item.blank_quantity) || 0)
+    };
+    if (item.operations !== undefined) {
+      row.operations = normalizeOperations(item.operations);
+    }
+    dedupedMap.set(id, row);
   }
-  return (data || []).map(withOperations);
+
+  const payload = Array.from(dedupedMap.values());
+  const BATCH_SIZE = 500;
+  let allSaved = [];
+
+  for (let i = 0; i < payload.length; i += BATCH_SIZE) {
+    const chunk = payload.slice(i, i + BATCH_SIZE);
+    const { data, error } = await supabase
+      .from('products')
+      .upsert(chunk, { onConflict: 'id' })
+      .select();
+
+    if (error) {
+      console.error('upsertProducts error:', error);
+      throw error;
+    }
+    if (data) {
+      allSaved = allSaved.concat(data.map(withOperations));
+    }
+  }
+  return allSaved;
 }
 
 /**

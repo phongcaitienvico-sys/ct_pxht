@@ -267,7 +267,7 @@ export function parseProductExcel(data) {
       const opMatch = /^(?:cd|congdoan)(\d{1,2})$/.exec(normKey);
       if (opMatch) {
         const n = Number(opMatch[1]);
-        const text = colVal === undefined || colVal === null ? '' : String(colVal).trim();
+        const text = cleanOperationName(colVal);
         if (n >= 1 && n <= MAX_PRODUCT_OPERATIONS && text) {
           opsByIndex.push({ n, text });
         }
@@ -290,30 +290,33 @@ export function parseProductExcel(data) {
     const rawName = matched.name !== undefined ? String(matched.name).trim() : '';
     const rawId = matched.id !== undefined && matched.id !== '' ? String(matched.id).trim() : '';
 
-    // Bỏ qua dòng trống hoàn toàn
+    // Bỏ qua dòng trống hoàn toàn hoặc dòng công thức C1/C2
     if (!rawName && !rawId && matched.order_quantity === undefined && matched.customer === undefined) {
+      return;
+    }
+    if (rawId === 'C1' || rawName === 'C2' || rawId.toLowerCase() === 'mẫu') {
       return;
     }
 
     // Tự sinh ID nếu thiếu
     const id = rawId || `SP_${Date.now().toString(36)}_${(index + 1).toString().padStart(3, '0')}`;
 
-    // Ép kiểu số lượng đơn hàng
+    // Ép kiểu số lượng đơn hàng (làm tròn về số nguyên để tương thích cột INTEGER trên PostgreSQL)
     let orderQuantity = 0;
     if (matched.order_quantity !== undefined && matched.order_quantity !== '') {
       const parsed = typeof matched.order_quantity === 'number'
         ? matched.order_quantity
         : Number(String(matched.order_quantity).replace(/,/g, '').trim());
-      if (Number.isFinite(parsed)) orderQuantity = parsed;
+      if (Number.isFinite(parsed) && parsed > 0) orderQuantity = Math.round(parsed);
     }
 
-    // Ép kiểu số lượng phôi
+    // Ép kiểu số lượng phôi (làm tròn về số nguyên)
     let blankQuantity = 0;
     if (matched.blank_quantity !== undefined && matched.blank_quantity !== '') {
       const parsed = typeof matched.blank_quantity === 'number'
         ? matched.blank_quantity
         : Number(String(matched.blank_quantity).replace(/,/g, '').trim());
-      if (Number.isFinite(parsed)) blankQuantity = parsed;
+      if (Number.isFinite(parsed) && parsed > 0) blankQuantity = Math.round(parsed);
     }
 
     // Trạng thái mặc định là 'Sx'

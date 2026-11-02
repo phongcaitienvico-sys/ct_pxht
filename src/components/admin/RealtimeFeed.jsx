@@ -549,15 +549,12 @@ export default function RealtimeFeed() {
                     log.employee_name || (log.employees && log.employees.full_name) || 'Chưa rõ';
                   const empCode =
                     log.employee_code || (log.employees && log.employees.code) || 'NV';
+                  const prodName =
+                    log.product_name || (log.products && log.products.name) || 'Sản phẩm ' + log.product_id;
                   const prodId =
                     log.product_id || (log.products && log.products.id) || '';
-                  const isDaily = !prodId || Boolean(log.is_daily_work);
-                  const prodName = isDaily
-                    ? (log.operation || log.daily_work || (log.notes ? `[Ghi chú] ${log.notes}` : 'Công nhật'))
-                    : (log.product_name || (log.products && log.products.name) || 'Sản phẩm ' + prodId);
-                  const customer = isDaily
-                    ? 'Công nhật'
-                    : (log.customer || (log.products && log.products.customer) || '');
+                  const customer =
+                    log.customer || (log.products && log.products.customer) || '';
 
                   return (
                     <tr
@@ -598,14 +595,8 @@ export default function RealtimeFeed() {
                           </span>
                         )}
                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                          {isDaily ? (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold text-[10px]">
-                              Công nhật
-                            </span>
-                          ) : (
-                            <span className="font-mono text-slate-400">#{prodId}</span>
-                          )}
-                          {customer && !isDaily && (
+                          <span className="font-mono text-slate-400">#{prodId}</span>
+                          {customer && (
                             <>
                               <span>•</span>
                               <span className="text-slate-600 font-medium truncate">
