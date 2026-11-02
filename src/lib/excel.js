@@ -258,18 +258,32 @@ export function parseProductExcel(data) {
 
   rawRows.forEach((row, index) => {
     const matched = {};
-    // Công đoạn: cột CD1..CD10 (hoặc CongDoan1..CongDoan10), giữ theo thứ tự số cột
+    // Công đoạn: cột CD1..CD30 (hoặc CongDoan1..CongDoan30, hoặc các cột nối tiếp sau CD5 bị trống tiêu đề __EMPTY)
     const opsByIndex = [];
+    let seenCdColumn = false;
+    let maxCdNumber = 0;
 
     for (const [colName, colVal] of Object.entries(row)) {
       const normKey = normalizeColumnKey(colName);
 
       const opMatch = /^(?:cd|congdoan)(\d{1,2})$/.exec(normKey);
       if (opMatch) {
+        seenCdColumn = true;
         const n = Number(opMatch[1]);
+        if (n > maxCdNumber) maxCdNumber = n;
         const text = cleanOperationName(colVal);
         if (n >= 1 && n <= MAX_PRODUCT_OPERATIONS && text) {
           opsByIndex.push({ n, text });
+        }
+        continue;
+      }
+
+      // Nếu người dùng dán quá cột CD5 trong file mẫu (tiêu đề cột trống -> __EMPTY, __EMPTY_1...)
+      if (seenCdColumn && /^__empty(_\d+)?$/i.test(String(colName).trim())) {
+        maxCdNumber += 1;
+        const text = cleanOperationName(colVal);
+        if (maxCdNumber <= MAX_PRODUCT_OPERATIONS && text) {
+          opsByIndex.push({ n: maxCdNumber, text });
         }
         continue;
       }
@@ -649,7 +663,17 @@ export function generateProductTemplate(options = {}) {
       'CD2': 'Hoàn thiện',
       'CD3': 'Nắn',
       'CD4': 'Sơn',
-      'CD5': 'Đóng thùng'
+      'CD5': 'Đóng thùng',
+      'CD6': '',
+      'CD7': '',
+      'CD8': '',
+      'CD9': '',
+      'CD10': '',
+      'CD11': '',
+      'CD12': '',
+      'CD13': '',
+      'CD14': '',
+      'CD15': ''
     },
     {
       'Mã SP': '1733',
@@ -662,7 +686,17 @@ export function generateProductTemplate(options = {}) {
       'CD2': 'Sơn',
       'CD3': 'Đóng thùng',
       'CD4': '',
-      'CD5': ''
+      'CD5': '',
+      'CD6': '',
+      'CD7': '',
+      'CD8': '',
+      'CD9': '',
+      'CD10': '',
+      'CD11': '',
+      'CD12': '',
+      'CD13': '',
+      'CD14': '',
+      'CD15': ''
     },
     {
       'Mã SP': '1775',
@@ -675,7 +709,17 @@ export function generateProductTemplate(options = {}) {
       'CD2': 'Nắn',
       'CD3': '',
       'CD4': '',
-      'CD5': ''
+      'CD5': '',
+      'CD6': '',
+      'CD7': '',
+      'CD8': '',
+      'CD9': '',
+      'CD10': '',
+      'CD11': '',
+      'CD12': '',
+      'CD13': '',
+      'CD14': '',
+      'CD15': ''
     }
   ];
 
