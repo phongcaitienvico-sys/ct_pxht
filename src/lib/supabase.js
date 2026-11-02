@@ -158,7 +158,7 @@ async function ensureDemoInitialized() {
 // ==============================================================================
 
 /**
- * Lấy toàn bộ danh mục sản phẩm
+ * Lấy toàn bộ danh mục sản phẩm (Hỗ trợ phân trang tự động vượt giới hạn 1.000 dòng/lần của Supabase)
  */
 export async function getProducts() {
   if (isDemoMode()) {
@@ -166,16 +166,32 @@ export async function getProducts() {
     return getStore(KEYS.PRODUCTS, []).map(withOperations);
   }
 
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('id', { ascending: true });
+  const PAGE_SIZE = 1000;
+  let allProducts = [];
+  let from = 0;
 
-  if (error) {
-    console.error('getProducts error:', error);
-    throw error;
+  while (true) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('getProducts error:', error);
+      throw error;
+    }
+    if (!data || data.length === 0) break;
+    allProducts = allProducts.concat(data.map(withOperations));
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
-  return (data || []).map(withOperations);
+
+  allProducts.sort((a, b) =>
+    String(a.id ?? '').localeCompare(String(b.id ?? ''), undefined, { numeric: true })
+  );
+
+  return allProducts;
 }
 
 /**
@@ -240,19 +256,40 @@ export async function bulkUpdateProductToggle(ids, isActive) {
     return products;
   }
 
-  let query = supabase.from('products').update({ is_active_today: activeBool, updated_at: now });
   if (ids === 'all') {
-    query = query.neq('id', '');
-  } else if (Array.isArray(ids)) {
-    query = query.in('id', ids.map(String));
+    const { data, error } = await supabase
+      .from('products')
+      .update({ is_active_today: activeBool, updated_at: now })
+      .neq('id', '')
+      .select();
+    if (error) {
+      console.error('bulkUpdateProductToggle error:', error);
+      throw error;
+    }
+    return data;
   }
 
-  const { data, error } = await query.select();
-  if (error) {
-    console.error('bulkUpdateProductToggle error:', error);
-    throw error;
+  if (Array.isArray(ids)) {
+    const strIds = ids.map(String);
+    const CHUNK_SIZE = 400;
+    let updatedRows = [];
+    for (let i = 0; i < strIds.length; i += CHUNK_SIZE) {
+      const chunk = strIds.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabase
+        .from('products')
+        .update({ is_active_today: activeBool, updated_at: now })
+        .in('id', chunk)
+        .select();
+      if (error) {
+        console.error('bulkUpdateProductToggle error:', error);
+        throw error;
+      }
+      if (data) updatedRows = updatedRows.concat(data);
+    }
+    return updatedRows;
   }
-  return data;
+
+  return [];
 }
 
 /**
