@@ -19,6 +19,22 @@ export function createEmptyRow() {
   };
 }
 
+/**
+ * Tạo một dòng Công nhật / Ghi chú (không gắn mã sản phẩm)
+ */
+export function createDailyWorkRow() {
+  const randomPart = Math.random().toString(36).substring(2, 9);
+  return {
+    id: `row_cn_${Date.now()}_${randomPart}`,
+    is_daily_work: true,
+    product_id: '',
+    quantity: '',
+    duration_hours: '',
+    operation: '',
+    notes: ''
+  };
+}
+
 export const DEMO_TEAM_MAP = {
   'team-1': 'a0000000-0000-0000-0000-000000000001',
   'team-2': 'a0000000-0000-0000-0000-000000000002'
@@ -132,6 +148,39 @@ export function validateEntryForm(formData, products = []) {
   // 3. Kiểm tra chi tiết từng dòng
   rows.forEach((row, index) => {
     const rowErrors = {};
+
+    if (row?.is_daily_work) {
+      const opText = row?.operation ? String(row.operation).trim() : '';
+      const noteText = row?.notes ? String(row.notes).trim() : '';
+      if (!opText && !noteText) {
+        rowErrors.operation = 'Vui lòng nhập nội dung công nhật hoặc ghi chú';
+        errorMessages.push(`Dòng ${index + 1}: Vui lòng nhập nội dung công nhật hoặc ghi chú`);
+      }
+
+      const rawQty = row?.quantity;
+      if (rawQty !== '' && rawQty !== null && rawQty !== undefined) {
+        const qtyNum = Number(rawQty);
+        if (Number.isNaN(qtyNum) || qtyNum < 0) {
+          rowErrors.quantity = 'Số lượng không hợp lệ';
+          errorMessages.push(`Dòng ${index + 1}: Số lượng không hợp lệ`);
+        }
+      }
+
+      const rawDur = row?.duration_hours;
+      if (rawDur !== '' && rawDur !== null && rawDur !== undefined) {
+        const durNum = Number(rawDur);
+        if (Number.isNaN(durNum) || durNum < 0) {
+          rowErrors.duration_hours = 'Thời gian không hợp lệ';
+          errorMessages.push(`Dòng ${index + 1}: Thời gian không hợp lệ`);
+        }
+      }
+
+      if (Object.keys(rowErrors).length > 0) {
+        errors.rows[index] = rowErrors;
+      }
+      return;
+    }
+
     const pid = row?.product_id ? String(row.product_id).trim() : '';
 
     if (!pid) {
@@ -211,17 +260,21 @@ export function buildBatchPayload(formData = {}, teamId = null, userId = null) {
   const finalTeamId = teamId || formData.team_id || null;
   const finalUserId = userId || formData.created_by || null;
 
-  return formData.rows.map((row) => ({
-    employee_id: formData.employee_id,
-    product_id: String(row.product_id || '').trim(),
-    team_id: finalTeamId,
-    created_by: finalUserId,
-    log_date,
-    quantity: Number(row.quantity) || 0,
-    duration_hours: Number(row.duration_hours) || 0,
-    operation: typeof row.operation === 'string' ? row.operation.trim() : '',
-    notes: typeof row.notes === 'string' ? row.notes.trim() : ''
-  }));
+  return formData.rows.map((row) => {
+    const isDaily = Boolean(row?.is_daily_work);
+    return {
+      employee_id: formData.employee_id,
+      product_id: isDaily ? null : String(row.product_id || '').trim(),
+      is_daily_work: isDaily,
+      team_id: finalTeamId,
+      created_by: finalUserId,
+      log_date,
+      quantity: Number(row.quantity) || 0,
+      duration_hours: Number(row.duration_hours) || 0,
+      operation: typeof row.operation === 'string' ? row.operation.trim() : '',
+      notes: typeof row.notes === 'string' ? row.notes.trim() : ''
+    };
+  });
 }
 
 /**

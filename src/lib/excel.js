@@ -491,9 +491,11 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     const empCode = log.employee_code || (log.employees && (log.employees.code || log.employees.id)) || '';
     const empName = log.employee_name || (log.employees && (log.employees.full_name || log.employees.name)) || '';
     const prodId = log.product_id || (log.products && (log.products.id || log.products.code)) || '';
-    const prodName = log.product_name || (log.products && log.products.name) || '';
-    const customer = log.customer || (log.products && log.products.customer) || '';
-    const operation = log.operation || '';
+    const isDaily = !prodId || Boolean(log.is_daily_work);
+    const prodName = isDaily ? '' : (log.product_name || (log.products && log.products.name) || '');
+    const customer = isDaily ? '' : (log.customer || (log.products && log.products.customer) || '');
+    const operation = isDaily ? '' : (log.operation || '');
+    const dailyWork = isDaily ? (log.operation || log.daily_work || '') : '';
     const qty = Number(log.quantity) || 0;
     const hours = Number(log.duration_hours) || 0;
     const notes = log.notes || '';
@@ -506,6 +508,7 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
       'Tên SP': prodName,
       'Khách hàng': customer,
       'Công đoạn': operation,
+      'Công nhật': dailyWork,
       'Số lượng': qty,
       'Số giờ': hours,
       'Ghi chú': notes
@@ -514,7 +517,7 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
 
   const wsDetail = XLSX.utils.json_to_sheet(
     detailRows.length > 0 ? detailRows : [
-      { 'Ngày': '', 'Mã NV': '', 'Tên NV': '', 'Mã SP': '', 'Tên SP': '', 'Khách hàng': '', 'Công đoạn': '', 'Số lượng': '', 'Số giờ': '', 'Ghi chú': '' }
+      { 'Ngày': '', 'Mã NV': '', 'Tên NV': '', 'Mã SP': '', 'Tên SP': '', 'Khách hàng': '', 'Công đoạn': '', 'Công nhật': '', 'Số lượng': '', 'Số giờ': '', 'Ghi chú': '' }
     ]
   );
 
@@ -526,6 +529,7 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     { wch: 35 }, // Tên SP
     { wch: 20 }, // Khách hàng
     { wch: 16 }, // Công đoạn
+    { wch: 25 }, // Công nhật
     { wch: 12 }, // Số lượng
     { wch: 10 }, // Số giờ
     { wch: 30 }  // Ghi chú
@@ -540,6 +544,8 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     const empCode = log.employee_code || (log.employees && (log.employees.code || log.employees.id)) || 'CHUA_RO';
     const empName = log.employee_name || (log.employees && (log.employees.full_name || log.employees.name)) || '';
     const logDate = log.log_date || log.date || (log.created_at ? String(log.created_at).slice(0, 10) : '');
+    const prodId = log.product_id || (log.products && (log.products.id || log.products.code)) || '';
+    const isDaily = !prodId || Boolean(log.is_daily_work);
     const qty = Number(log.quantity) || 0;
     const hours = Number(log.duration_hours) || 0;
 
@@ -550,6 +556,9 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
         empName,
         totalQty: 0,
         totalHours: 0,
+        dailyWorkHours: 0,
+        dailyWorkSet: new Set(),
+        notesSet: new Set(),
         workDays: new Set()
       };
       employeeSummaryMap.set(empCode, existing);
@@ -558,6 +567,13 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     if (!existing.empName && empName) existing.empName = empName;
     existing.totalQty += qty;
     existing.totalHours += hours;
+    if (isDaily) {
+      existing.dailyWorkHours += hours;
+      const opText = String(log.operation || log.daily_work || '').trim();
+      if (opText) existing.dailyWorkSet.add(opText);
+    }
+    const noteText = String(log.notes || '').trim();
+    if (noteText) existing.notesSet.add(noteText);
     if (logDate) {
       existing.workDays.add(logDate);
     }
@@ -568,12 +584,15 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     'Tên NV': item.empName,
     'Tổng sản phẩm': item.totalQty,
     'Tổng giờ': Math.round(item.totalHours * 100) / 100,
+    'Giờ công nhật': Math.round(item.dailyWorkHours * 100) / 100,
+    'Nội dung công nhật': Array.from(item.dailyWorkSet).join(', '),
+    'Ghi chú': Array.from(item.notesSet).join(', '),
     'Số ngày làm việc': item.workDays.size
   }));
 
   const wsSummary = XLSX.utils.json_to_sheet(
     summaryRows.length > 0 ? summaryRows : [
-      { 'Mã NV': '', 'Tên NV': '', 'Tổng sản phẩm': '', 'Tổng giờ': '', 'Số ngày làm việc': '' }
+      { 'Mã NV': '', 'Tên NV': '', 'Tổng sản phẩm': '', 'Tổng giờ': '', 'Giờ công nhật': '', 'Nội dung công nhật': '', 'Ghi chú': '', 'Số ngày làm việc': '' }
     ]
   );
 
@@ -582,6 +601,9 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     { wch: 22 }, // Tên NV
     { wch: 16 }, // Tổng sản phẩm
     { wch: 14 }, // Tổng giờ
+    { wch: 14 }, // Giờ công nhật
+    { wch: 30 }, // Nội dung công nhật
+    { wch: 25 }, // Ghi chú
     { wch: 18 }  // Số ngày làm việc
   ];
 

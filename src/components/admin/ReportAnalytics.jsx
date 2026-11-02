@@ -80,9 +80,24 @@ export default function ReportAnalytics() {
         getProducts()
       ]);
 
-      setLogs(logsData || []);
+      const safeLogs = logsData || [];
+      setLogs(safeLogs);
       setEmployees(employeesData || []);
       setProducts(productsData || []);
+
+      if (!isSilent && safeLogs.length > 0) {
+        const thisMonthRange = getDatePresetRange('this_month');
+        const thisMonthMatches = filterLogsByCriteria(safeLogs, thisMonthRange);
+        if (thisMonthMatches.length === 0) {
+          const lastMonthRange = getDatePresetRange('last_month');
+          const lastMonthMatches = filterLogsByCriteria(safeLogs, lastMonthRange);
+          if (lastMonthMatches.length > 0) {
+            setActivePreset('last_month');
+            setStartDate(lastMonthRange.startDate);
+            setEndDate(lastMonthRange.endDate);
+          }
+        }
+      }
     } catch (err) {
       console.error('Error fetching analytics data:', err);
       showToast('error', 'Không thể kết nối máy chủ dữ liệu: ' + (err.message || 'Lỗi mạng'));
@@ -611,8 +626,9 @@ export default function ReportAnalytics() {
                         <tr>
                           <th className="px-6 py-3">STT</th>
                           <th className="px-6 py-3">Mã #ID</th>
-                          <th className="px-6 py-3">Tên sản phẩm</th>
+                          <th className="px-6 py-3">Tên sản phẩm / Công nhật</th>
                           <th className="px-6 py-3">Khách hàng</th>
+                          <th className="px-6 py-3">Công đoạn / Công nhật</th>
                           <th className="px-6 py-3 text-right">Số lượng</th>
                           <th className="px-6 py-3 text-right">Thời gian</th>
                           <th className="px-6 py-3 text-right">Năng suất</th>
@@ -621,36 +637,68 @@ export default function ReportAnalytics() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700">
                         {group.logs.map((log, idx) => {
-                          const prodRate = log.duration_hours > 0
+                          const isDaily = !log.product_id || Boolean(log.is_daily_work);
+                          const prodRate = log.duration_hours > 0 && log.quantity > 0
                             ? Math.round((Number(log.quantity) / Number(log.duration_hours)) * 100) / 100
                             : 0;
                           return (
-                            <tr key={log.id || idx} className="hover:bg-slate-50/70 transition">
+                            <tr key={log.id || idx} className={isDaily ? 'bg-amber-50/30 hover:bg-amber-50/60 transition' : 'hover:bg-slate-50/70 transition'}>
                               <td className="px-6 py-3 text-xs text-slate-400 font-mono">
                                 {idx + 1}
                               </td>
-                              <td className="px-6 py-3 font-mono text-xs font-bold text-blue-600">
-                                #{log.product_id || (log.products && log.products.id) || '---'}
+                              <td className="px-6 py-3 font-mono text-xs font-bold">
+                                {isDaily ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 font-sans">
+                                    Công nhật
+                                  </span>
+                                ) : (
+                                  <span className="text-blue-600">
+                                    #{log.product_id || (log.products && log.products.id) || '---'}
+                                  </span>
+                                )}
                               </td>
                               <td className="px-6 py-3 font-semibold text-slate-900 max-w-xs truncate" title={log.product_name}>
-                                {log.product_name || (log.products && log.products.name) || '---'}
+                                {isDaily
+                                  ? log.operation || log.daily_work || (log.notes ? `[Ghi chú] ${log.notes}` : 'Công việc công nhật')
+                                  : log.product_name || (log.products && log.products.name) || '---'}
                               </td>
                               <td className="px-6 py-3 text-slate-600">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">
-                                  {log.customer || (log.products && log.products.customer) || 'Nội bộ'}
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
+                                  isDaily ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {isDaily ? 'Công nhật' : (log.customer || (log.products && log.products.customer) || 'Nội bộ')}
                                 </span>
                               </td>
+                              <td className="px-6 py-3 text-xs font-medium text-violet-700">
+                                {log.operation ? (
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-semibold ${
+                                    isDaily
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      : 'bg-violet-50 text-violet-700 border-violet-200'
+                                  }`}>
+                                    {log.operation}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
+                              </td>
                               <td className="px-6 py-3 text-right font-bold text-slate-900">
-                                {formatNumber(log.quantity)}
+                                {isDaily && Number(log.quantity) === 0 ? '—' : formatNumber(log.quantity)}
                               </td>
                               <td className="px-6 py-3 text-right text-slate-600 font-mono text-xs">
                                 {log.duration_hours} h
                               </td>
                               <td className="px-6 py-3 text-right text-xs font-semibold text-emerald-600">
-                                {prodRate} sp/h
+                                {isDaily && Number(log.quantity) === 0 ? '—' : `${prodRate} sp/h`}
                               </td>
-                              <td className="px-6 py-3 text-xs text-slate-500 italic max-w-xs truncate" title={log.notes}>
-                                {log.notes || '—'}
+                              <td className="px-6 py-3 text-xs text-slate-600 max-w-xs truncate" title={log.notes}>
+                                {log.notes ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
+                                    {log.notes}
+                                  </span>
+                                ) : (
+                                  '—'
+                                )}
                               </td>
                             </tr>
                           );
@@ -687,15 +735,16 @@ export default function ReportAnalytics() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-3.5">STT</th>
-                    <th className="px-6 py-3.5">Mã NV</th>
-                    <th className="px-6 py-3.5">Họ và tên</th>
-                    <th className="px-6 py-3.5 text-center">Số ngày làm</th>
-                    <th className="px-6 py-3.5 text-center">Số lượt ghi</th>
-                    <th className="px-6 py-3.5 text-right">Tổng sản phẩm</th>
-                    <th className="px-6 py-3.5 text-right">Tổng giờ</th>
-                    <th className="px-6 py-3.5 text-right">Năng suất (sp/h)</th>
-                    <th className="px-6 py-3.5 text-center">Thao tác</th>
+                    <th className="px-4 py-3.5">STT</th>
+                    <th className="px-4 py-3.5">Mã NV</th>
+                    <th className="px-4 py-3.5">Họ và tên</th>
+                    <th className="px-4 py-3.5 text-center">Số ngày làm</th>
+                    <th className="px-4 py-3.5 text-right">Tổng sản phẩm</th>
+                    <th className="px-4 py-3.5 text-right">Tổng giờ</th>
+                    <th className="px-4 py-3.5">Công nhật</th>
+                    <th className="px-4 py-3.5">Ghi chú</th>
+                    <th className="px-4 py-3.5 text-right">Năng suất (sp/h)</th>
+                    <th className="px-4 py-3.5 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -711,33 +760,53 @@ export default function ReportAnalytics() {
                         }
                       }}
                     >
-                      <td className="px-6 py-4 text-xs font-mono text-slate-400">
+                      <td className="px-4 py-4 text-xs font-mono text-slate-400">
                         {index + 1}
                       </td>
-                      <td className="px-6 py-4 font-mono text-xs font-bold text-blue-600">
+                      <td className="px-4 py-4 font-mono text-xs font-bold text-blue-600">
                         {emp.employeeCode}
                       </td>
-                      <td className="px-6 py-4 font-semibold text-slate-900 group-hover:text-blue-700 transition">
+                      <td className="px-4 py-4 font-semibold text-slate-900 group-hover:text-blue-700 transition">
                         {emp.employeeName}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-4 text-center">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                           {emp.workDaysCount} ngày
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
-                        {emp.logsCount}
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-900">
+                      <td className="px-4 py-4 text-right font-bold text-slate-900">
                         {formatNumber(emp.totalQuantity)}
                       </td>
-                      <td className="px-6 py-4 text-right text-slate-600 font-mono text-xs">
+                      <td className="px-4 py-4 text-right text-slate-600 font-mono text-xs">
                         {emp.totalHours} h
                       </td>
-                      <td className="px-6 py-4 text-right text-xs font-bold text-emerald-600">
+                      <td className="px-4 py-4 text-xs max-w-[220px]" title={emp.dailyWorkSummary}>
+                        {emp.dailyWorkSummary || emp.dailyWorkHours > 0 ? (
+                          <div className="space-y-0.5">
+                            {emp.dailyWorkHours > 0 && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 mr-1">
+                                {emp.dailyWorkHours}h
+                              </span>
+                            )}
+                            <span className="text-slate-700 line-clamp-1">{emp.dailyWorkSummary || 'Công nhật'}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-xs text-slate-600 max-w-[180px] truncate" title={emp.notesSummary}>
+                        {emp.notesSummary ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
+                            {emp.notesSummary}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-right text-xs font-bold text-emerald-600">
                         {emp.productivityPerHour}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-4 text-center">
                         <button
                           type="button"
                           onClick={(e) => {

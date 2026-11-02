@@ -30,6 +30,7 @@ import { AuthContext } from '../../contexts/AuthContext.jsx';
 
 import {
   createEmptyRow,
+  createDailyWorkRow,
   validateEntryForm,
   buildBatchPayload,
   filterActiveProducts,
@@ -128,6 +129,10 @@ export default function LeaderEntryForm({
   // Handlers for rows
   const handleAddRow = () => {
     setRows((prev) => [...prev, createEmptyRow()]);
+  };
+
+  const handleAddDailyWorkRow = () => {
+    setRows((prev) => [...prev, createDailyWorkRow()]);
   };
 
   const handleRemoveRow = (indexToRemove) => {
@@ -474,20 +479,49 @@ export default function LeaderEntryForm({
                           : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
-                      {/* Tiêu đề dòng & nút xóa */}
-                      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                      {/* Tiêu đề dòng & chuyển đổi Sản phẩm / Công nhật & nút xóa */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
                           <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-700 font-extrabold flex items-center justify-center text-xs">
                             #{index + 1}
                           </span>
-                          <span>Món thứ {index + 1}</span>
+                          <div className="inline-flex rounded-xl bg-slate-100 p-0.5 text-xs font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleRowChange(index, 'is_daily_work', false);
+                                handleRowChange(index, 'operation', '');
+                              }}
+                              className={`px-2.5 py-1 rounded-lg transition-all ${
+                                !row.is_daily_work
+                                  ? 'bg-white text-blue-700 shadow-xs font-bold'
+                                  : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              📦 Theo Sản Phẩm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleRowChange(index, 'is_daily_work', true);
+                                handleRowChange(index, 'product_id', '');
+                              }}
+                              className={`px-2.5 py-1 rounded-lg transition-all ${
+                                row.is_daily_work
+                                  ? 'bg-amber-500 text-white shadow-xs font-bold'
+                                  : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              🛠️ Công Nhật / Ghi Chú
+                            </button>
+                          </div>
                         </div>
 
                         {rows.length > 1 && (
                           <button
                             type="button"
                             onClick={() => handleRemoveRow(index)}
-                            className="min-h-[44px] min-w-[44px] -my-2 -mr-2 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1"
+                            className="min-h-[36px] px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1"
                             title="Xóa món này"
                             aria-label={`Xóa món thứ ${index + 1}`}
                           >
@@ -497,202 +531,300 @@ export default function LeaderEntryForm({
                         )}
                       </div>
 
-                      {/* Chọn sản phẩm */}
-                      <div className="mb-3">
-                        <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                          <Package className="w-3.5 h-3.5 text-blue-600" />
-                          Sản phẩm <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={row.product_id}
-                            onChange={(e) => handleRowChange(index, 'product_id', e.target.value)}
-                            className={`w-full min-h-[48px] px-3 py-2.5 rounded-xl border bg-white text-slate-800 text-sm font-medium shadow-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none ${
-                              rowError.product_id || isDuplicate
-                                ? 'border-rose-400 bg-rose-50/40 text-rose-900 focus:ring-rose-400'
-                                : 'border-slate-300'
-                            }`}
-                          >
-                            <option value="">-- Chọn sản phẩm Quản đốc đã mở --</option>
-                            {activeProducts.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {formatProductLabel(p)}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
-                            ▼
-                          </div>
-                        </div>
-
-                        {(rowError.product_id || isDuplicate) && (
-                          <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                            {isDuplicate
-                              ? 'Sản phẩm này bị chọn trùng ở 2 dòng!'
-                              : rowError.product_id}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Chọn công đoạn (chỉ hiện khi sản phẩm có công đoạn) */}
-                      {rowOperations.length > 0 && (
-                        <div className="mb-3">
-                          <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                            <Layers className="w-3.5 h-3.5 text-blue-600" />
-                            Công đoạn <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <select
+                      {row.is_daily_work ? (
+                        /* ================= CHẾ ĐỘ NHẬP CÔNG NHẬT & GHI CHÚ ================= */
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-amber-900 mb-1 flex items-center gap-1">
+                              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                              Nội dung Công nhật <span className="font-normal text-slate-400">(việc ngoài đơn hàng, sửa hàng, đai thùng...)</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="VD: Sửa miệng Cx, Hàn sửa rỗ sau gia công, Đai thùng..."
                               value={row.operation || ''}
                               onChange={(e) => handleRowChange(index, 'operation', e.target.value)}
-                              className={`w-full min-h-[48px] px-3 py-2.5 rounded-xl border bg-white text-slate-800 text-sm font-medium shadow-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none ${
-                                rowError.operation
-                                  ? 'border-rose-400 bg-rose-50/40 text-rose-900 focus:ring-rose-400'
-                                  : 'border-slate-300'
+                              className={`w-full min-h-[46px] px-3 py-2 rounded-xl border bg-amber-50/30 text-slate-800 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none ${
+                                rowError.operation ? 'border-rose-400 bg-rose-50/40' : 'border-amber-300'
                               }`}
-                            >
-                              <option value="">-- Chọn công đoạn --</option>
-                              {rowOperations.map((op) => (
-                                <option key={op} value={op}>
-                                  {op}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
-                              ▼
+                            />
+                            {rowError.operation && (
+                              <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                                {rowError.operation}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                            <div className="bg-emerald-50/40 p-2.5 sm:p-3 rounded-xl border border-emerald-200/80">
+                              <label className="block text-xs font-bold text-emerald-900 mb-1">
+                                Số lượng (nếu có)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={row.quantity}
+                                onChange={(e) => handleRowChange(index, 'quantity', e.target.value)}
+                                className="w-full min-h-[44px] px-2 py-1 text-center text-lg font-black rounded-lg border border-emerald-300 bg-white text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                              />
+                            </div>
+
+                            <div className="bg-blue-50/40 p-2.5 sm:p-3 rounded-xl border border-blue-200/80">
+                              <label className="block text-xs font-bold text-blue-900 mb-1 flex items-center justify-between">
+                                <span>Giờ công nhật (h)</span>
+                                <div className="flex gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustDuration(index, -0.5)}
+                                    className="w-6 h-6 rounded bg-white border border-blue-300 text-blue-800 text-[11px] font-bold flex items-center justify-center"
+                                  >
+                                    -0.5
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustDuration(index, 0.5)}
+                                    className="w-6 h-6 rounded bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center"
+                                  >
+                                    +0.5
+                                  </button>
+                                </div>
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                inputMode="decimal"
+                                placeholder="0.0"
+                                value={row.duration_hours}
+                                onChange={(e) => handleRowChange(index, 'duration_hours', e.target.value)}
+                                className="w-full min-h-[44px] px-2 py-1 text-center text-lg font-black rounded-lg border border-blue-300 bg-white text-blue-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                              />
                             </div>
                           </div>
 
-                          {rowError.operation && (
-                            <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                              {rowError.operation}
-                            </p>
-                          )}
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              Ghi chú <span className="font-normal text-slate-400">(VD: Quản lý, Nghỉ, Tăng ca, lý do...)</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Nhập ghi chú (ví dụ: Quản lý, Nghỉ, hỗ trợ tổ khác...)"
+                              value={row.notes}
+                              onChange={(e) => handleRowChange(index, 'notes', e.target.value)}
+                              className="w-full min-h-[42px] px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-400 outline-none"
+                            />
+                          </div>
                         </div>
+                      ) : (
+                        /* ================= CHẾ ĐỘ NHẬP SẢN PHẨM KHOÁN ================= */
+                        <>
+                          {/* Chọn sản phẩm */}
+                          <div className="mb-3">
+                            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5 text-blue-600" />
+                              Sản phẩm <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={row.product_id}
+                                onChange={(e) => handleRowChange(index, 'product_id', e.target.value)}
+                                className={`w-full min-h-[48px] px-3 py-2.5 rounded-xl border bg-white text-slate-800 text-sm font-medium shadow-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none ${
+                                  rowError.product_id || isDuplicate
+                                    ? 'border-rose-400 bg-rose-50/40 text-rose-900 focus:ring-rose-400'
+                                    : 'border-slate-300'
+                                }`}
+                              >
+                                <option value="">-- Chọn sản phẩm Quản đốc đã mở --</option>
+                                {activeProducts.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {formatProductLabel(p)}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
+                                ▼
+                              </div>
+                            </div>
+
+                            {(rowError.product_id || isDuplicate) && (
+                              <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                                {isDuplicate
+                                  ? 'Sản phẩm này bị chọn trùng ở 2 dòng!'
+                                  : rowError.product_id}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Chọn công đoạn (chỉ hiện khi sản phẩm có công đoạn) */}
+                          {rowOperations.length > 0 && (
+                            <div className="mb-3">
+                              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                                <Layers className="w-3.5 h-3.5 text-blue-600" />
+                                Công đoạn <span className="text-rose-500">*</span>
+                              </label>
+                              <div className="relative">
+                                <select
+                                  value={row.operation || ''}
+                                  onChange={(e) => handleRowChange(index, 'operation', e.target.value)}
+                                  className={`w-full min-h-[48px] px-3 py-2.5 rounded-xl border bg-white text-slate-800 text-sm font-medium shadow-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none ${
+                                    rowError.operation
+                                      ? 'border-rose-400 bg-rose-50/40 text-rose-900 focus:ring-rose-400'
+                                      : 'border-slate-300'
+                                  }`}
+                                >
+                                  <option value="">-- Chọn công đoạn --</option>
+                                  {rowOperations.map((op) => (
+                                    <option key={op} value={op}>
+                                      {op}
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
+                                  ▼
+                                </div>
+                              </div>
+
+                              {rowError.operation && (
+                                <p className="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                                  {rowError.operation}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* 2 Cột: Số lượng & Thời gian */}
+                          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 mb-2.5">
+                            {/* Cột Số lượng */}
+                            <div className="bg-emerald-50/40 p-2.5 sm:p-3 rounded-xl border border-emerald-200/80">
+                              <label className="block text-xs font-bold text-emerald-900 mb-1 flex items-center justify-between">
+                                <span>Số lượng (cái) *</span>
+                                <div className="flex gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustQuantity(index, -1)}
+                                    className="w-7 h-7 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center hover:bg-emerald-100 active:scale-95"
+                                  >
+                                    -1
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustQuantity(index, 1)}
+                                    className="w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center justify-center hover:bg-emerald-700 active:scale-95"
+                                  >
+                                    +1
+                                  </button>
+                                </div>
+                              </label>
+
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={row.quantity}
+                                onChange={(e) => handleRowChange(index, 'quantity', e.target.value)}
+                                className={`w-full min-h-[48px] px-2 py-1.5 text-center text-xl sm:text-2xl font-black rounded-lg border bg-white shadow-inner focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${
+                                  rowError.quantity
+                                    ? 'border-rose-400 text-rose-700 bg-rose-50'
+                                    : 'border-emerald-300 text-emerald-800'
+                                }`}
+                              />
+
+                              {rowError.quantity && (
+                                <p className="text-[11px] text-rose-600 mt-1 font-semibold text-center">
+                                  {rowError.quantity}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Cột Thời gian */}
+                            <div className="bg-blue-50/40 p-2.5 sm:p-3 rounded-xl border border-blue-200/80">
+                              <label className="block text-xs font-bold text-blue-900 mb-1 flex items-center justify-between">
+                                <span>Giờ làm (h) *</span>
+                                <div className="flex gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustDuration(index, -0.5)}
+                                    className="w-7 h-7 rounded-lg bg-white border border-blue-300 text-blue-800 text-xs font-bold flex items-center justify-center hover:bg-blue-100 active:scale-95"
+                                  >
+                                    -0.5
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustDuration(index, 0.5)}
+                                    className="w-7 h-7 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center hover:bg-blue-700 active:scale-95"
+                                  >
+                                    +0.5
+                                  </button>
+                                </div>
+                              </label>
+
+                              <input
+                                type="number"
+                                min="0.1"
+                                step="0.1"
+                                inputMode="decimal"
+                                placeholder="0.0"
+                                value={row.duration_hours}
+                                onChange={(e) => handleRowChange(index, 'duration_hours', e.target.value)}
+                                className={`w-full min-h-[48px] px-2 py-1.5 text-center text-xl sm:text-2xl font-black rounded-lg border bg-white shadow-inner focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
+                                  rowError.duration_hours
+                                    ? 'border-rose-400 text-rose-700 bg-rose-50'
+                                    : 'border-blue-300 text-blue-800'
+                                }`}
+                              />
+
+                              {rowError.duration_hours && (
+                                <p className="text-[11px] text-rose-600 mt-1 font-semibold text-center">
+                                  {rowError.duration_hours}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Ghi chú tùy chọn */}
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="Ghi chú thêm (ví dụ: tiện thô, hàn đắp...)"
+                              value={row.notes}
+                              onChange={(e) => handleRowChange(index, 'notes', e.target.value)}
+                              className="w-full min-h-[40px] px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-400 outline-none"
+                            />
+                          </div>
+                        </>
                       )}
-
-                      {/* 2 Cột: Số lượng & Thời gian */}
-                      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 mb-2.5">
-                        {/* Cột Số lượng */}
-                        <div className="bg-emerald-50/40 p-2.5 sm:p-3 rounded-xl border border-emerald-200/80">
-                          <label className="block text-xs font-bold text-emerald-900 mb-1 flex items-center justify-between">
-                            <span>Số lượng (cái) *</span>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => adjustQuantity(index, -1)}
-                                className="w-7 h-7 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center hover:bg-emerald-100 active:scale-95"
-                              >
-                                -1
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => adjustQuantity(index, 1)}
-                                className="w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center justify-center hover:bg-emerald-700 active:scale-95"
-                              >
-                                +1
-                              </button>
-                            </div>
-                          </label>
-
-                          <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={row.quantity}
-                            onChange={(e) => handleRowChange(index, 'quantity', e.target.value)}
-                            className={`w-full min-h-[48px] px-2 py-1.5 text-center text-xl sm:text-2xl font-black rounded-lg border bg-white shadow-inner focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${
-                              rowError.quantity
-                                ? 'border-rose-400 text-rose-700 bg-rose-50'
-                                : 'border-emerald-300 text-emerald-800'
-                            }`}
-                          />
-
-                          {rowError.quantity && (
-                            <p className="text-[11px] text-rose-600 mt-1 font-semibold text-center">
-                              {rowError.quantity}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Cột Thời gian */}
-                        <div className="bg-blue-50/40 p-2.5 sm:p-3 rounded-xl border border-blue-200/80">
-                          <label className="block text-xs font-bold text-blue-900 mb-1 flex items-center justify-between">
-                            <span>Giờ làm (h) *</span>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => adjustDuration(index, -0.5)}
-                                className="w-7 h-7 rounded-lg bg-white border border-blue-300 text-blue-800 text-xs font-bold flex items-center justify-center hover:bg-blue-100 active:scale-95"
-                              >
-                                -0.5
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => adjustDuration(index, 0.5)}
-                                className="w-7 h-7 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center hover:bg-blue-700 active:scale-95"
-                              >
-                                +0.5
-                              </button>
-                            </div>
-                          </label>
-
-                          <input
-                            type="number"
-                            min="0.1"
-                            step="0.1"
-                            inputMode="decimal"
-                            placeholder="0.0"
-                            value={row.duration_hours}
-                            onChange={(e) => handleRowChange(index, 'duration_hours', e.target.value)}
-                            className={`w-full min-h-[48px] px-2 py-1.5 text-center text-xl sm:text-2xl font-black rounded-lg border bg-white shadow-inner focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
-                              rowError.duration_hours
-                                ? 'border-rose-400 text-rose-700 bg-rose-50'
-                                : 'border-blue-300 text-blue-800'
-                            }`}
-                          />
-
-                          {rowError.duration_hours && (
-                            <p className="text-[11px] text-rose-600 mt-1 font-semibold text-center">
-                              {rowError.duration_hours}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Ghi chú tùy chọn */}
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="Ghi chú thêm (ví dụ: tiện thô, hàn đắp...)"
-                          value={row.notes}
-                          onChange={(e) => handleRowChange(index, 'notes', e.target.value)}
-                          className="w-full min-h-[40px] px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-400 outline-none"
-                        />
-                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Nút Thêm Dòng Sản Phẩm */}
-              <button
-                type="button"
-                onClick={handleAddRow}
-                className="w-full min-h-[48px] py-3.5 px-4 rounded-2xl border-2 border-dashed border-blue-400 bg-blue-50/60 hover:bg-blue-100/70 text-blue-800 font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all active:scale-[0.99] shadow-sm"
-              >
-                <Plus className="w-5 h-5 text-blue-700" />
-                <span>
-                  + THÊM DÒNG SẢN PHẨM CHO{' '}
-                  {selectedEmployee
-                    ? `ANH ${selectedEmployee.full_name.toUpperCase()}`
-                    : 'THỢ NÀY'}
-                </span>
-              </button>
+              {/* Nút Thêm Dòng Sản Phẩm & Thêm Công Nhật */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="w-full min-h-[48px] py-3 px-4 rounded-2xl border-2 border-dashed border-blue-400 bg-blue-50/60 hover:bg-blue-100/70 text-blue-800 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] shadow-sm"
+                >
+                  <Plus className="w-4 h-4 text-blue-700" />
+                  <span>+ THÊM DÒNG SẢN PHẨM</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddDailyWorkRow}
+                  className="w-full min-h-[48px] py-3 px-4 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50/60 hover:bg-amber-100/70 text-amber-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] shadow-sm"
+                >
+                  <Plus className="w-4 h-4 text-amber-700" />
+                  <span>+ THÊM CÔNG NHẬT / GHI CHÚ</span>
+                </button>
+              </div>
             </div>
 
             {/* BƯỚC 3: TỔNG KẾT & NÚT LƯU 1 CHẠM */}
@@ -730,7 +862,7 @@ export default function LeaderEntryForm({
               {/* Nút to màu xanh lá: LƯU TẤT CẢ TRONG 1 CHẠM */}
               <button
                 type="submit"
-                disabled={submitting || activeProducts.length === 0}
+                disabled={submitting || (activeProducts.length === 0 && !rows.some((r) => r.is_daily_work))}
                 className="w-full min-h-[54px] py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-base sm:text-lg shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (

@@ -522,9 +522,12 @@ export default function LeaderDailyLogs({
                   {/* Log Items List */}
                   <div className="divide-y divide-slate-100">
                     {group.logs.map((log) => {
-                      const prodName = log.product_name || log.products?.name || 'Sản phẩm';
                       const prodId = log.product_id || log.products?.id || '';
-                      const customer = log.customer || log.products?.customer || '';
+                      const isDaily = !prodId || Boolean(log.is_daily_work);
+                      const prodName = isDaily
+                        ? (log.operation || log.daily_work || (log.notes ? `[Ghi chú] ${log.notes}` : 'Công nhật'))
+                        : (log.product_name || log.products?.name || 'Sản phẩm');
+                      const customer = isDaily ? '' : (log.customer || log.products?.customer || '');
 
                       return (
                         <div
@@ -537,12 +540,16 @@ export default function LeaderDailyLogs({
                               <span className="text-xs font-bold text-slate-800">
                                 {prodName}
                               </span>
-                              {prodId && (
+                              {prodId ? (
                                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                   #{prodId}
                                 </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                  Công nhật
+                                </span>
                               )}
-                              {log.operation && (
+                              {log.operation && !isDaily && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                                   Công đoạn: {log.operation}
                                 </span>

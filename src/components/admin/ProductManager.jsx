@@ -126,8 +126,9 @@ export default function ProductManager() {
     blank_quantity: 0,
     status: 'Sx',
     is_active_today: false,
-    operationsText: ''
+    operations: []
   });
+  const [newOpInput, setNewOpInput] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -329,8 +330,9 @@ export default function ProductManager() {
       blank_quantity: 0,
       status: 'Sx',
       is_active_today: false,
-      operationsText: ''
+      operations: []
     });
+    setNewOpInput('');
     setFormErrors({});
     setIsFormModalOpen(true);
   };
@@ -345,15 +347,56 @@ export default function ProductManager() {
       blank_quantity: product.blank_quantity || 0,
       status: product.status || 'Sx',
       is_active_today: Boolean(product.is_active_today),
-      operationsText: Array.isArray(product.operations) ? product.operations.join(', ') : ''
+      operations: Array.isArray(product.operations) ? [...product.operations] : []
     });
+    setNewOpInput('');
     setFormErrors({});
     setIsFormModalOpen(true);
   };
 
+  const handleAddOperation = () => {
+    const currentOps = Array.isArray(formData.operations) ? formData.operations : [];
+    if (currentOps.length >= MAX_OPERATIONS) return;
+    const trimmed = newOpInput.trim();
+    if (trimmed) {
+      setFormData({ ...formData, operations: [...currentOps, trimmed] });
+      setNewOpInput('');
+    } else {
+      setFormData({ ...formData, operations: [...currentOps, ''] });
+    }
+  };
+
+  const handleChangeOperation = (idx, val) => {
+    const currentOps = Array.isArray(formData.operations) ? [...formData.operations] : [];
+    currentOps[idx] = val;
+    setFormData({ ...formData, operations: currentOps });
+  };
+
+  const handleRemoveOperation = (idx) => {
+    const currentOps = Array.isArray(formData.operations) ? formData.operations : [];
+    setFormData({ ...formData, operations: currentOps.filter((_, i) => i !== idx) });
+  };
+
   const handleSaveProduct = async (e) => {
     e.preventDefault();
-    const validation = validateProductInput(formData);
+    const rawOps = [
+      ...(Array.isArray(formData.operations) ? formData.operations : []),
+      ...(newOpInput.trim() ? [newOpInput.trim()] : [])
+    ];
+    const seenOps = new Set();
+    const cleanedOps = [];
+    rawOps
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+      .forEach((x) => {
+        const key = x.toLowerCase();
+        if (!seenOps.has(key) && cleanedOps.length < MAX_OPERATIONS) {
+          seenOps.add(key);
+          cleanedOps.push(x);
+        }
+      });
+
+    const validation = validateProductInput({ ...formData, operations: cleanedOps });
 
     if (!validation.valid) {
       setFormErrors(validation.errors);
@@ -363,7 +406,7 @@ export default function ProductManager() {
     setIsSubmitting(true);
     try {
       await upsertProducts([
-        { ...validation.sanitized, operations: parseOperationsText(formData.operationsText) }
+        { ...validation.sanitized, operations: cleanedOps }
       ]);
       showToast('success', editingProduct ? 'Đã cập nhật sản phẩm thành công' : 'Đã thêm sản phẩm mới thành công');
       setIsFormModalOpen(false);
@@ -1109,19 +1152,67 @@ export default function ProductManager() {
 
               {/* Operations */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Công Đoạn <span className="font-normal text-slate-400">(tùy chọn)</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.operationsText}
-                  onChange={(e) => setFormData({ ...formData, operationsText: e.target.value })}
-                  placeholder="Cách nhau bằng dấu phẩy hoặc xuống dòng, ví dụ: Cắt, Hàn, Sơn (tối đa 10)"
-                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  {parseOperationsText(formData.operationsText).length}/{MAX_OPERATIONS} công đoạn
-                </p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Công Đoạn <span className="font-normal text-slate-400">(tùy chọn, thêm từng công đoạn)</span>
+                  </label>
+                  <span className="text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">
+                    {(formData.operations || []).filter((x) => String(x || '').trim()).length}/{MAX_OPERATIONS} công đoạn
+                  </span>
+                </div>
+
+                {/* Danh sách từng công đoạn */}
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {(formData.operations || []).map((op, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="w-11 text-center py-1.5 rounded-lg bg-violet-100 text-violet-700 font-mono text-xs font-bold shrink-0">
+                        CD{idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={op}
+                        onChange={(e) => handleChangeOperation(idx, e.target.value)}
+                        placeholder={`Tên công đoạn ${idx + 1} (VD: Mài đậu, Hoàn thiện, Sơn...)`}
+                        className="flex-1 px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-slate-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveOperation(idx)}
+                        title="Xóa công đoạn này"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Ô thêm công đoạn mới */}
+                {(formData.operations || []).length < MAX_OPERATIONS && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={newOpInput}
+                      onChange={(e) => setNewOpInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddOperation();
+                        }
+                      }}
+                      placeholder="Nhập công đoạn mới rồi bấm + Thêm (hoặc bấm Enter)..."
+                      className="flex-1 px-3.5 py-2 text-sm bg-slate-50 border border-dashed border-violet-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddOperation}
+                      className="inline-flex items-center gap-1 px-3.5 py-2 text-xs font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-xl transition-colors shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Thêm công đoạn</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Active Today Row */}

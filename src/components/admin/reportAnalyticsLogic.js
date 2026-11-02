@@ -349,6 +349,9 @@ export function groupLogsByEmployeeSummary(logs) {
         teamName,
         totalQuantity: 0,
         totalHours: 0,
+        dailyWorkHours: 0,
+        dailyWorkSet: new Set(),
+        notesSet: new Set(),
         workDays: new Set(),
         productsSet: new Set(),
         logsCount: 0
@@ -365,6 +368,18 @@ export function groupLogsByEmployeeSummary(logs) {
     existing.totalHours += hrs;
     existing.logsCount += 1;
 
+    const isDaily = !log.product_id || Boolean(log.is_daily_work);
+    if (isDaily) {
+      existing.dailyWorkHours += hrs;
+      const opText = String(log.operation || log.daily_work || '').trim();
+      if (opText) existing.dailyWorkSet.add(opText);
+    }
+
+    const noteText = String(log.notes || '').trim();
+    if (noteText) {
+      existing.notesSet.add(noteText);
+    }
+
     if (logDate) {
       existing.workDays.add(logDate);
     }
@@ -378,6 +393,7 @@ export function groupLogsByEmployeeSummary(logs) {
   const summaries = Array.from(mapByEmp.values()).map((item) => {
     const workDaysCount = item.workDays.size;
     const totalHours = Math.round(item.totalHours * 100) / 100;
+    const dailyWorkHours = Math.round(item.dailyWorkHours * 100) / 100;
     const productivityPerHour = totalHours > 0
       ? Math.round((item.totalQuantity / totalHours) * 100) / 100
       : 0;
@@ -393,6 +409,9 @@ export function groupLogsByEmployeeSummary(logs) {
       teamName: item.teamName,
       totalQuantity: item.totalQuantity,
       totalHours,
+      dailyWorkHours,
+      dailyWorkSummary: Array.from(item.dailyWorkSet).join(', '),
+      notesSummary: Array.from(item.notesSet).join(', '),
       workDaysCount,
       logsCount: item.logsCount,
       productCount: item.productsSet.size,

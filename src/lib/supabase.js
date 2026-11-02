@@ -461,8 +461,34 @@ export async function deleteEmployee(id) {
 // PRODUCTION LOGS APIS
 // ==============================================================================
 
+const ZERO_QTY_MARKER = '\u200B';
+
+function normalizeSupabaseLogRow(row) {
+  if (!row) return row;
+  const isDailyWork = !row.product_id;
+  const rawOp = String(row.operation || '');
+  const hasZeroMarker = isDailyWork && rawOp.endsWith(ZERO_QTY_MARKER);
+  const cleanOp = rawOp.replace(/\u200B/g, '').trim();
+  const effectiveQty = hasZeroMarker ? 0 : Number(row.quantity) || 0;
+
+  return {
+    ...row,
+    product_id: row.product_id || null,
+    is_daily_work: isDailyWork,
+    daily_work: isDailyWork ? cleanOp : '',
+    operation: cleanOp,
+    quantity: effectiveQty,
+    employee_name: row.employee_name || row.employees?.full_name || '',
+    employee_code: row.employee_code || row.employees?.code || '',
+    product_name: row.product_id
+      ? row.product_name || row.products?.name || ''
+      : cleanOp || (row.notes ? `[Ghi chú] ${row.notes}` : 'Công nhật'),
+    customer: row.product_id ? row.customer || row.products?.customer || '' : 'Công nhật'
+  };
+}
+
 /**
- * Ghi nhận nhật ký sản lượng (Hỗ trợ batch insert nhiều sản phẩm cho 1 thợ)
+ * Ghi nhận nhật ký sản lượng (Hỗ trợ batch insert nhiều sản phẩm hoặc công nhật cho 1 thợ)
  */
 export async function submitProductionLogs(logsArray) {
   if (!Array.isArray(logsArray) || logsArray.length === 0) {
@@ -481,24 +507,30 @@ export async function submitProductionLogs(logsArray) {
     const inserted = logsArray.map((item) => {
       const id = item.id || generateId();
       const log_date = item.log_date || today;
+      const pid = item.product_id ? String(item.product_id).trim() : null;
+      const isDailyWork = !pid || Boolean(item.is_daily_work);
       const quantity = Number(item.quantity) || 0;
       const duration_hours = Number(item.duration_hours) || 0;
+      const cleanOp = String(item.operation ?? '').replace(/\u200B/g, '').trim();
       const emp = employees.find((e) => e.id === item.employee_id);
-      const prod = products.find((p) => String(p.id) === String(item.product_id));
+      const prod = pid ? products.find((p) => String(p.id) === pid) : null;
       const team = teams.find((t) => t.id === item.team_id);
 
       return {
         ...item,
         id,
+        product_id: isDailyWork ? null : pid,
+        is_daily_work: isDailyWork,
+        daily_work: isDailyWork ? cleanOp : '',
         log_date,
         quantity,
         duration_hours,
-        operation: String(item.operation ?? '').trim(),
+        operation: cleanOp,
         created_at: item.created_at || now,
         employee_name: emp ? emp.full_name : '',
         employee_code: emp ? emp.code : '',
-        product_name: prod ? prod.name : '',
-        customer: prod ? prod.customer : '',
+        product_name: prod ? prod.name : cleanOp || (item.notes ? `[Ghi chú] ${item.notes}` : 'Công nhật'),
+        customer: prod ? prod.customer : 'Công nhật',
         team_name: team ? team.name : '',
         employees: emp || null,
         products: prod || null,
@@ -516,14 +548,24 @@ export async function submitProductionLogs(logsArray) {
     return inserted;
   }
 
-  const formatted = logsArray.map(({ created_by, ...item }) => ({
-    ...item,
-    log_date: item.log_date || today,
-    quantity: Number(item.quantity) || 0,
-    duration_hours: Number(item.duration_hours) || 0,
-    operation: String(item.operation ?? '').trim(),
-    created_at: item.created_at || now
-  }));
+  const formatted = logsArray.map(({ created_by, is_daily_work, daily_work, ...item }) => {
+    const pid = item.product_id ? String(item.product_id).trim() : null;
+    const isDaily = !pid || Boolean(is_daily_work);
+    const rawQty = Number(item.quantity) || 0;
+    const cleanOp = String(item.operation ?? daily_work ?? '').replace(/\u200B/g, '').trim();
+    const dbQty = isDaily && rawQty <= 0 ? 1 : rawQty;
+    const dbOp = isDaily && rawQty <= 0 ? `${cleanOp}${ZERO_QTY_MARKER}` : cleanOp;
+
+    return {
+      ...item,
+      product_id: isDaily ? null : pid,
+      log_date: item.log_date || today,
+      quantity: dbQty,
+      duration_hours: Number(item.duration_hours) || 0,
+      operation: dbOp,
+      created_at: item.created_at || now
+    };
+  });
 
   const { data, error } = await supabase
     .from('production_logs')
@@ -534,7 +576,7 @@ export async function submitProductionLogs(logsArray) {
     console.error('submitProductionLogs error:', error);
     throw error;
   }
-  return data;
+  return (data || []).map(normalizeSupabaseLogRow);
 }
 
 /**
@@ -566,14 +608,23 @@ export async function getProductionLogs(filter = {}) {
 
     const enriched = logs.map((l) => {
       const emp = employees.find((e) => e.id === l.employee_id);
-      const prod = products.find((p) => String(p.id) === String(l.product_id));
+      const pid = l.product_id ? String(l.product_id).trim() : null;
+      const isDaily = !pid || Boolean(l.is_daily_work);
+      const prod = pid ? products.find((p) => String(p.id) === pid) : null;
       const team = teams.find((t) => t.id === l.team_id);
+      const cleanOp = String(l.operation ?? '').replace(/\u200B/g, '').trim();
       return {
         ...l,
+        product_id: isDaily ? null : pid,
+        is_daily_work: isDaily,
+        daily_work: isDaily ? cleanOp : '',
+        operation: cleanOp,
         employee_name: emp ? emp.full_name : (l.employee_name || ''),
         employee_code: emp ? emp.code : (l.employee_code || ''),
-        product_name: prod ? prod.name : (l.product_name || ''),
-        customer: prod ? prod.customer : (l.customer || ''),
+        product_name: prod
+          ? prod.name
+          : (l.product_name || cleanOp || (l.notes ? `[Ghi chú] ${l.notes}` : 'Công nhật')),
+        customer: prod ? prod.customer : (isDaily ? 'Công nhật' : (l.customer || '')),
         team_name: team ? team.name : (l.team_name || ''),
         employees: emp || l.employees || null,
         products: prod || l.products || null,
@@ -624,10 +675,11 @@ export async function getProductionLogs(filter = {}) {
       throw error;
     }
     if (!data || data.length === 0) break;
-    allRows = allRows.concat(data);
+    allRows = allRows.concat(data.map(normalizeSupabaseLogRow));
     if (data.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
+
   return allRows;
 }
 
@@ -651,16 +703,16 @@ export async function updateProductionLog(logId, updates) {
     const updated = { ...oldRecord, ...updates };
     if (updates.quantity !== undefined) updated.quantity = Number(updates.quantity);
     if (updates.duration_hours !== undefined) updated.duration_hours = Number(updates.duration_hours);
-    if (updates.operation !== undefined) updated.operation = String(updates.operation ?? '').trim();
+    if (updates.operation !== undefined) updated.operation = String(updates.operation ?? '').replace(/\u200B/g, '').trim();
 
     const emp = employees.find((e) => e.id === updated.employee_id);
-    const prod = products.find((p) => String(p.id) === String(updated.product_id));
+    const prod = updated.product_id ? products.find((p) => String(p.id) === String(updated.product_id)) : null;
     const team = teams.find((t) => t.id === updated.team_id);
 
     updated.employee_name = emp ? emp.full_name : '';
     updated.employee_code = emp ? emp.code : '';
-    updated.product_name = prod ? prod.name : '';
-    updated.customer = prod ? prod.customer : '';
+    updated.product_name = prod ? prod.name : (updated.operation || 'Công nhật');
+    updated.customer = prod ? prod.customer : 'Công nhật';
     updated.team_name = team ? team.name : '';
     updated.employees = emp || null;
     updated.products = prod || null;
@@ -673,8 +725,17 @@ export async function updateProductionLog(logId, updates) {
     return updated;
   }
 
-  const payload = { ...updates };
-  if (payload.operation !== undefined) payload.operation = String(payload.operation ?? '').trim();
+  const { is_daily_work, daily_work, ...payload } = updates;
+  if (payload.operation !== undefined) payload.operation = String(payload.operation ?? '').replace(/\u200B/g, '').trim();
+  if (payload.product_id === '') payload.product_id = null;
+  if ((payload.product_id === null || is_daily_work) && payload.quantity !== undefined) {
+    const rawQty = Number(payload.quantity) || 0;
+    const cleanOp = String(payload.operation ?? daily_work ?? '').replace(/\u200B/g, '').trim();
+    if (rawQty <= 0) {
+      payload.quantity = 1;
+      payload.operation = `${cleanOp}${ZERO_QTY_MARKER}`;
+    }
+  }
 
   const { data, error } = await supabase
     .from('production_logs')
@@ -687,7 +748,7 @@ export async function updateProductionLog(logId, updates) {
     console.error('updateProductionLog error:', error);
     throw error;
   }
-  return data;
+  return normalizeSupabaseLogRow(data);
 }
 
 /**
