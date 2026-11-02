@@ -3,7 +3,7 @@
  * Supports searching, filtering, bulk toggles, reset shift, pagination, and validation.
  */
 
-export const MAX_OPERATIONS = 10;
+export const MAX_OPERATIONS = 30;
 
 /**
  * Remove Vietnamese accents / diacritics and normalize search string

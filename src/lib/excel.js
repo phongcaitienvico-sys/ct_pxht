@@ -84,7 +84,7 @@ function saveWorkbook(wb, defaultFileName, options = {}) {
   }
 }
 
-const MAX_PRODUCT_OPERATIONS = 10;
+const MAX_PRODUCT_OPERATIONS = 30;
 
 // Bảng ánh xạ các cột dữ liệu sản phẩm
 const PRODUCT_FIELD_MAP = {
@@ -346,7 +346,7 @@ export function parseProductExcel(data) {
 
 // Bảng ánh xạ các cột danh sách nhân viên
 const EMPLOYEE_FIELD_MAP = {
-  code: ['manv', 'manhanvien', 'code', 'employeecode', 'id', 'ma', 'idnhanvien'],
+  code: ['manv', 'manhanvien', 'code', 'employeecode', 'id', 'ma', 'idnhanvien', 'idnhansu', 'manhansu'],
   full_name: ['hovaten', 'hoten', 'fullname', 'name', 'tennv', 'tennhanvien', 'nhanvien', 'ten'],
   team_name: ['to', 'tosanxuat', 'bophan', 'tobophan', 'teamname', 'department', 'team', 'phongban'],
   is_active: ['isactive', 'hoatdong', 'trangthai', 'active']
@@ -376,8 +376,9 @@ function tryParsePxhtMasterEmployees(wb) {
 
   const rows = XLSX.utils.sheet_to_json(dataSheet, { header: 1, defval: '' });
   const headerRow2 = rows[1] || [];
+  const col0Key = normalizeColumnKey(headerRow2[0]);
   if (
-    normalizeColumnKey(headerRow2[0]) !== 'idnhanvien' ||
+    !['idnhanvien', 'idnhansu', 'manv', 'manhanvien'].includes(col0Key) ||
     normalizeColumnKey(headerRow2[1]) !== 'hovaten'
   ) {
     return null;
@@ -453,12 +454,19 @@ export function parseEmployeeExcel(data) {
     const rawFullName = matched.full_name !== undefined ? String(matched.full_name).trim() : '';
     const rawTeam = matched.team_name !== undefined ? String(matched.team_name).trim() : '';
 
-    // Bỏ qua dòng trống
+    // Bỏ qua dòng trống hoặc dòng ký hiệu C1 / NV000
     if (!rawCode && !rawFullName) {
       return;
     }
+    if (
+      rawCode.toUpperCase() === 'C1' ||
+      /^NV0+$/i.test(rawCode) ||
+      normalizeColumnKey(rawFullName) === 'congtrungbinh'
+    ) {
+      return;
+    }
 
-    const code = rawCode || `NV_${(index + 1).toString().padStart(2, '0')}`;
+    const code = rawCode ? normalizeEmployeeCode(rawCode) : `NV_${(index + 1).toString().padStart(2, '0')}`;
     let isActive = true;
     if (matched.is_active !== undefined && matched.is_active !== '') {
       const v = String(matched.is_active).trim().toLowerCase();

@@ -48,9 +48,9 @@ import {
   generateProductTemplate
 } from '../../lib/excel.js';
 
-const MAX_OPERATIONS = 10;
+const MAX_OPERATIONS = 30;
 
-/** Parse "a, b" hoặc nhiều dòng -> ['a','b'] (trim, bỏ trùng/rỗng, tối đa 10) */
+/** Parse "a, b" hoặc nhiều dòng -> ['a','b'] (trim, bỏ trùng/rỗng, tối đa 30) */
 function parseOperationsText(text) {
   const seen = new Set();
   const result = [];
@@ -68,8 +68,8 @@ function parseOperationsText(text) {
   return result;
 }
 
-/** Hiển thị các công đoạn dạng chip nhỏ (tối đa 5 chip, phần còn lại +n) */
-function OperationChips({ operations, max = 5 }) {
+/** Hiển thị đầy đủ các công đoạn dạng chip nhỏ */
+function OperationChips({ operations, max = 30 }) {
   const list = Array.isArray(operations) ? operations.filter(Boolean) : [];
   if (list.length === 0) return null;
   const shown = list.slice(0, max);
@@ -1359,7 +1359,7 @@ export default function ProductManager() {
                               {Array.isArray(row.operations) && row.operations.length > 0 ? (
                                 <div className="flex flex-wrap items-center gap-1">
                                   <span className="font-semibold text-violet-700">{row.operations.length}</span>
-                                  <OperationChips operations={row.operations} max={3} />
+                                  <OperationChips operations={row.operations} max={30} />
                                 </div>
                               ) : (
                                 <span className="text-slate-400">—</span>

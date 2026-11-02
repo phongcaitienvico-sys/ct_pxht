@@ -76,7 +76,7 @@ function generateId() {
   });
 }
 
-export const MAX_OPERATIONS = 10;
+export const MAX_OPERATIONS = 30;
 
 /**
  * Chuẩn hóa danh sách công đoạn: mảng chuỗi đã trim, bỏ rỗng, tối đa 10 mục

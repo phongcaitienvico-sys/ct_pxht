@@ -79,8 +79,8 @@ async function runTests() {
   assert.deepStrictEqual((await getProducts()).find(p => p.id === '9999').operations, ['Mài đậu', 'Sơn'], 'operations trimmed, empties dropped');
   await upsertProducts([{ ...newProduct, name: 'Đổi tên' }]);
   assert.deepStrictEqual((await getProducts()).find(p => p.id === '9999').operations, ['Mài đậu', 'Sơn'], 'undefined operations keeps existing');
-  await upsertProducts([{ ...newProduct, operations: Array.from({ length: 12 }, (_, i) => 'CD' + (i + 1)) }]);
-  assert.strictEqual((await getProducts()).find(p => p.id === '9999').operations.length, 10, 'max 10 operations');
+  await upsertProducts([{ ...newProduct, operations: Array.from({ length: 32 }, (_, i) => 'CD' + (i + 1)) }]);
+  assert.strictEqual((await getProducts()).find(p => p.id === '9999').operations.length, 30, 'max 30 operations');
   console.log('✔ product operations passed');
 
   // 6. Teams & Employees
