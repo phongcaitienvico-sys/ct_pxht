@@ -95,9 +95,12 @@ export function filterProducts(products = [], { searchTerm = '', customerFilter 
       if (!matchesQuery) return false;
     }
 
-    // 2. Customer dropdown filter
+    // 2. Customer filter (supports both exact selection and accent-insensitive typing)
     if (targetCust) {
-      if (String(p.customer || '').trim() !== targetCust) {
+      const custRaw = String(p.customer || '').trim();
+      const custNorm = normalizeSearchText(custRaw);
+      const targetNorm = normalizeSearchText(targetCust);
+      if (custRaw !== targetCust && (!targetNorm || !custNorm.includes(targetNorm))) {
         return false;
       }
     }
