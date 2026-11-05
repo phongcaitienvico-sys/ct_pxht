@@ -98,11 +98,11 @@ const PRODUCT_FIELD_MAP = {
 };
 
 /**
- * Chuẩn hóa tên công đoạn (bỏ tiền tố số thứ tự như "01- ", "02 - " nếu có)
+ * Chuẩn hóa tên công đoạn (giữ nguyên tiền tố số thứ tự như "01- ", "02- " theo file Excel)
  */
 function cleanOperationName(raw) {
   if (raw === undefined || raw === null) return '';
-  return String(raw).trim().replace(/^\d+\s*-\s*/, '').trim();
+  return String(raw).trim();
 }
 
 /**
