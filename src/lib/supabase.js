@@ -521,14 +521,50 @@ export async function deleteEmployee(id) {
 // ==============================================================================
 
 const ZERO_QTY_MARKER = '\u200B';
+const QTY_META_REGEX = /\u200B#QTY=([0-9.]+)\u200B/g;
+
+function stripQtyMeta(op) {
+  return String(op ?? '')
+    .replace(QTY_META_REGEX, '')
+    .replace(/\u200B/g, '')
+    .trim();
+}
+
+function encodeLogQuantityAndOp(rawQty, rawOp, isDaily) {
+  const numQty = Number(rawQty) || 0;
+  const cleanOp = stripQtyMeta(rawOp);
+  if (isDaily && numQty <= 0) {
+    return {
+      dbQty: 1,
+      dbOp: `${cleanOp}${ZERO_QTY_MARKER}`
+    };
+  }
+  const safePositive = numQty > 0 ? Math.round(numQty * 1000) / 1000 : 1;
+  if (Number.isInteger(safePositive) && safePositive >= 1) {
+    return {
+      dbQty: safePositive,
+      dbOp: cleanOp
+    };
+  }
+  return {
+    dbQty: Math.max(1, Math.round(safePositive)),
+    dbOp: `${cleanOp}\u200B#QTY=${safePositive}\u200B`
+  };
+}
 
 function normalizeSupabaseLogRow(row) {
   if (!row) return row;
   const isDailyWork = !row.product_id;
   const rawOp = String(row.operation || '');
-  const hasZeroMarker = isDailyWork && rawOp.endsWith(ZERO_QTY_MARKER);
-  const cleanOp = rawOp.replace(/\u200B/g, '').trim();
-  const effectiveQty = hasZeroMarker ? 0 : Number(row.quantity) || 0;
+  const qtyMatch = /\u200B#QTY=([0-9.]+)\u200B/.exec(rawOp);
+  const hasZeroMarker = isDailyWork && !qtyMatch && rawOp.endsWith(ZERO_QTY_MARKER);
+  const cleanOp = stripQtyMeta(rawOp);
+  let effectiveQty = Number(row.quantity) || 0;
+  if (qtyMatch && Number.isFinite(Number(qtyMatch[1]))) {
+    effectiveQty = Number(qtyMatch[1]);
+  } else if (hasZeroMarker) {
+    effectiveQty = 0;
+  }
 
   return {
     ...row,
@@ -610,10 +646,11 @@ export async function submitProductionLogs(logsArray) {
   const formatted = logsArray.map(({ created_by, is_daily_work, daily_work, ...item }) => {
     const pid = item.product_id ? String(item.product_id).trim() : null;
     const isDaily = !pid || Boolean(is_daily_work);
-    const rawQty = Number(item.quantity) || 0;
-    const cleanOp = String(item.operation ?? daily_work ?? '').replace(/\u200B/g, '').trim();
-    const dbQty = isDaily && rawQty <= 0 ? 1 : rawQty;
-    const dbOp = isDaily && rawQty <= 0 ? `${cleanOp}${ZERO_QTY_MARKER}` : cleanOp;
+    const { dbQty, dbOp } = encodeLogQuantityAndOp(
+      item.quantity,
+      item.operation ?? daily_work ?? '',
+      isDaily
+    );
 
     return {
       ...item,
@@ -785,15 +822,28 @@ export async function updateProductionLog(logId, updates) {
   }
 
   const { is_daily_work, daily_work, ...payload } = updates;
-  if (payload.operation !== undefined) payload.operation = String(payload.operation ?? '').replace(/\u200B/g, '').trim();
   if (payload.product_id === '') payload.product_id = null;
-  if ((payload.product_id === null || is_daily_work) && payload.quantity !== undefined) {
+  if (payload.quantity !== undefined) {
     const rawQty = Number(payload.quantity) || 0;
-    const cleanOp = String(payload.operation ?? daily_work ?? '').replace(/\u200B/g, '').trim();
-    if (rawQty <= 0) {
-      payload.quantity = 1;
-      payload.operation = `${cleanOp}${ZERO_QTY_MARKER}`;
+    const isDaily = payload.product_id === null || Boolean(is_daily_work);
+    let baseOp = payload.operation !== undefined ? payload.operation : daily_work;
+    if (baseOp === undefined && (!Number.isInteger(rawQty) || rawQty < 1)) {
+      const { data: existingRow } = await supabase
+        .from('production_logs')
+        .select('operation, product_id')
+        .eq('id', logId)
+        .maybeSingle();
+      baseOp = existingRow?.operation ?? '';
     }
+    if (baseOp !== undefined || !Number.isInteger(rawQty) || rawQty < 1) {
+      const { dbQty, dbOp } = encodeLogQuantityAndOp(rawQty, baseOp ?? '', isDaily);
+      payload.quantity = dbQty;
+      payload.operation = dbOp;
+    } else {
+      payload.quantity = rawQty;
+    }
+  } else if (payload.operation !== undefined) {
+    payload.operation = stripQtyMeta(payload.operation);
   }
 
   const { data, error } = await supabase
@@ -853,7 +903,11 @@ export function subscribeToLogs(callback) {
   const channel = supabase
     .channel('production_logs_realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'production_logs' }, (payload) => {
-      callback(payload);
+      callback({
+        ...payload,
+        new: payload.new ? normalizeSupabaseLogRow(payload.new) : payload.new,
+        old: payload.old ? normalizeSupabaseLogRow(payload.old) : payload.old
+      });
     })
     .subscribe();
 

@@ -180,13 +180,13 @@ export default function LeaderEntryForm({
 
   const adjustQuantity = (index, delta) => {
     const currentVal = Number(rows[index]?.quantity) || 0;
-    const newVal = Math.max(1, currentVal + delta);
+    const newVal = Math.max(0.1, Math.round((currentVal + delta) * 100) / 100);
     handleRowChange(index, 'quantity', String(newVal));
   };
 
   const adjustDuration = (index, delta) => {
     const currentVal = Number(rows[index]?.duration_hours) || 0;
-    const newVal = Math.max(0.5, Math.round((currentVal + delta) * 10) / 10);
+    const newVal = Math.max(0.5, Math.round((currentVal + delta) * 100) / 100);
     handleRowChange(index, 'duration_hours', String(newVal));
   };
 
@@ -564,8 +564,8 @@ export default function LeaderEntryForm({
                               <input
                                 type="number"
                                 min="0"
-                                step="1"
-                                inputMode="numeric"
+                                step="any"
+                                inputMode="decimal"
                                 placeholder="0"
                                 value={row.quantity}
                                 onChange={(e) => handleRowChange(index, 'quantity', e.target.value)}
@@ -596,7 +596,7 @@ export default function LeaderEntryForm({
                               <input
                                 type="number"
                                 min="0"
-                                step="0.1"
+                                step="any"
                                 inputMode="decimal"
                                 placeholder="0.0"
                                 value={row.duration_hours}
@@ -724,9 +724,9 @@ export default function LeaderEntryForm({
 
                               <input
                                 type="number"
-                                min="1"
-                                step="1"
-                                inputMode="numeric"
+                                min="0.01"
+                                step="any"
+                                inputMode="decimal"
                                 placeholder="0"
                                 value={row.quantity}
                                 onChange={(e) => handleRowChange(index, 'quantity', e.target.value)}
@@ -768,8 +768,8 @@ export default function LeaderEntryForm({
 
                               <input
                                 type="number"
-                                min="0.1"
-                                step="0.1"
+                                min="0.01"
+                                step="any"
                                 inputMode="decimal"
                                 placeholder="0.0"
                                 value={row.duration_hours}

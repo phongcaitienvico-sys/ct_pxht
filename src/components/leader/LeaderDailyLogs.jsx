@@ -195,7 +195,9 @@ export default function LeaderDailyLogs({
       await updateProductionLog(editingLog.id, {
         quantity: validation.parsedQuantity,
         duration_hours: validation.parsedDuration,
-        notes: editNotes.trim()
+        notes: editNotes.trim(),
+        operation: editingLog.operation || '',
+        product_id: editingLog.product_id || null
       });
 
       showToast('Đã cập nhật nhật ký sản lượng thành công!', 'success');
@@ -239,7 +241,7 @@ export default function LeaderDailyLogs({
   // Edit increment / decrement helpers for mobile touch
   const handleAdjustEditQuantity = (delta) => {
     const current = Number(editQuantity) || 0;
-    const nextVal = Math.max(1, current + delta);
+    const nextVal = Math.max(0.1, Math.round((current + delta) * 100) / 100);
     setEditQuantity(String(nextVal));
     if (editErrors.quantity) {
       setEditErrors((prev) => ({ ...prev, quantity: '' }));
@@ -248,7 +250,7 @@ export default function LeaderDailyLogs({
 
   const handleAdjustEditDuration = (delta) => {
     const current = Number(editDuration) || 0;
-    const nextVal = Math.max(0.5, Math.round((current + delta) * 10) / 10);
+    const nextVal = Math.max(0.5, Math.round((current + delta) * 100) / 100);
     setEditDuration(String(nextVal));
     if (editErrors.duration) {
       setEditErrors((prev) => ({ ...prev, duration: '' }));
@@ -668,7 +670,7 @@ export default function LeaderDailyLogs({
                   </button>
                   <input
                     type="number"
-                    min="1"
+                    min="0.01" step="any" inputMode="decimal"
                     value={editQuantity}
                     onChange={(e) => {
                       setEditQuantity(e.target.value);
@@ -713,8 +715,8 @@ export default function LeaderDailyLogs({
                   </button>
                   <input
                     type="number"
-                    step="0.1"
-                    min="0.1"
+                    step="any"
+                    min="0.01" inputMode="decimal"
                     value={editDuration}
                     onChange={(e) => {
                       setEditDuration(e.target.value);

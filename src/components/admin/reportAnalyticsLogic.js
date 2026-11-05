@@ -242,7 +242,7 @@ export function calculateAnalyticsKPI(logs) {
 
   return {
     totalLogs: logs.length,
-    totalQuantity,
+    totalQuantity: Math.round(totalQuantity * 100) / 100,
     totalHours: roundedHours,
     workDaysCount,
     uniqueEmployeesCount: employeesSet.size,
@@ -305,7 +305,7 @@ export function groupLogsByDay(logs) {
       const timeB = b.created_at || '';
       return timeB.localeCompare(timeA);
     }),
-    totalQuantity: item.totalQuantity,
+    totalQuantity: Math.round(item.totalQuantity * 100) / 100,
     totalHours: Math.round(item.totalHours * 100) / 100,
     productCount: item.productSet.size
   }));
@@ -407,7 +407,7 @@ export function groupLogsByEmployeeSummary(logs) {
       employeeName: item.employeeName,
       teamId: item.teamId,
       teamName: item.teamName,
-      totalQuantity: item.totalQuantity,
+      totalQuantity: Math.round(item.totalQuantity * 100) / 100,
       totalHours,
       dailyWorkHours,
       dailyWorkSummary: Array.from(item.dailyWorkSet).join(', '),
@@ -461,7 +461,7 @@ export function groupLogsByOperation(logs) {
 
   const result = Array.from(mapByOp.values()).map((g) => ({
     ...g,
-    totalHours: Math.round(g.totalHours * 100) / 100
+    totalQuantity: Math.round(g.totalQuantity * 100) / 100, totalHours: Math.round(g.totalHours * 100) / 100
   }));
   result.sort((a, b) => b.totalQuantity - a.totalQuantity || a.operation.localeCompare(b.operation));
   return result;

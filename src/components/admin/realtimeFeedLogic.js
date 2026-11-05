@@ -110,7 +110,7 @@ export function calculateTodayKPI(logs = [], targetDate = null) {
   const roundedHours = Math.round(totalHours * 10) / 10;
 
   return {
-    totalQuantity,
+    totalQuantity: Math.round(totalQuantity * 100) / 100,
     totalHours: roundedHours,
     activeWorkersCount: workerSet.size,
     activeTeamsCount: teamSet.size,

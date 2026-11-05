@@ -146,6 +146,8 @@ export default function ProductManager() {
   // Confirm Reset Shift Dialog state
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState(null);
+  const [isBulkToggling, setIsBulkToggling] = useState(false);
 
   // Delete Confirm Dialog state
   const [deletingProductId, setDeletingProductId] = useState(null);
@@ -286,6 +288,19 @@ export default function ProductManager() {
     }
   };
 
+  const requestBulkToggle = (nextState) => {
+    const targetIds = selectedIds.size > 0 ? Array.from(selectedIds) : filteredProducts.map((p) => String(p.id));
+    if (targetIds.length === 0) {
+      showToast('info', 'Không có sản phẩm nào để cập nhật');
+      return;
+    }
+    setBulkConfirm({
+      nextState,
+      count: targetIds.length,
+      isSelectedMode: selectedIds.size > 0
+    });
+  };
+
   // Bulk Toggle for Selected or All Filtered
   const handleBulkToggle = async (nextState) => {
     let targetIds = [];
@@ -303,16 +318,21 @@ export default function ProductManager() {
     const actionText = nextState ? 'Bật' : 'Tắt';
 
     // Optimistic UI update
+    setIsBulkToggling(true);
     setProducts((prev) => bulkToggleProducts(prev, targetIds, nextState));
 
     try {
       await bulkUpdateProductToggle(targetIds, nextState);
       showToast('success', `Đã ${actionText.toLowerCase()} thành công ${targetIds.length} sản phẩm`);
       setSelectedIds(new Set());
+      setBulkConfirm(null);
+      setIsBulkToggling(false);
     } catch (err) {
       console.error('Bulk toggle error:', err);
       loadProducts(false);
       showToast('error', `Lỗi khi ${actionText.toLowerCase()} sản phẩm: ` + err.message);
+      setIsBulkToggling(false);
+      setBulkConfirm(null);
     }
   };
 
@@ -324,6 +344,8 @@ export default function ProductManager() {
       setProducts((prev) => resetShiftProducts(prev));
       await bulkUpdateProductToggle('all', false);
       setSelectedIds(new Set());
+      setBulkConfirm(null);
+      setIsBulkToggling(false);
       setIsResetConfirmOpen(false);
       showToast('success', 'Đã tắt toàn bộ sản phẩm hôm nay. Ca mới sẵn sàng!');
     } catch (err) {
@@ -798,7 +820,7 @@ export default function ProductManager() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => handleBulkToggle(true)}
+              onClick={() => requestBulkToggle(true)}
               className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl border border-emerald-200 transition-colors shadow-sm"
               title="Bật hôm nay cho các mục đã chọn hoặc tất cả kết quả đang lọc"
             >
@@ -807,7 +829,7 @@ export default function ProductManager() {
             </button>
 
             <button
-              onClick={() => handleBulkToggle(false)}
+              onClick={() => requestBulkToggle(false)}
               className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-colors shadow-sm"
               title="Tắt hôm nay cho các mục đã chọn hoặc tất cả kết quả đang lọc"
             >
@@ -1482,6 +1504,50 @@ export default function ProductManager() {
       )}
 
       {/* ========================================================================= */}
+      {bulkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-4">
+            <div className={`flex items-center space-x-3 ${bulkConfirm.nextState ? 'text-emerald-600' : 'text-amber-600'}`}>
+              <div className={`p-3 rounded-xl border ${bulkConfirm.nextState ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
+                <AlertTriangle className={`w-6 h-6 ${bulkConfirm.nextState ? 'text-emerald-600' : 'text-amber-600'}`} />
+              </div>
+              <h3 className="font-bold text-lg text-slate-900">
+                {bulkConfirm.nextState ? 'Xác Nhận Bật Sản Phẩm Hôm Nay' : 'Xác Nhận Tắt Sản Phẩm Hôm Nay'}
+              </h3>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Bạn có chắc chắn muốn{' '}
+              <span className={`font-semibold ${bulkConfirm.nextState ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {bulkConfirm.nextState ? 'BẬT LÀM HÔM NAY' : 'TẮT HÔM NAY'}
+              </span>{' '}
+              cho <span className="font-bold text-slate-900">{bulkConfirm.count}</span> mã sản phẩm{' '}
+              {bulkConfirm.isSelectedMode ? 'đã tích chọn' : 'trong danh sách kết quả hiện tại'} không?
+            </p>
+            <div className="pt-2 flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                disabled={isBulkToggling}
+                onClick={() => setBulkConfirm(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={isBulkToggling}
+                onClick={() => handleBulkToggle(bulkConfirm.nextState)}
+                className={`inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl shadow-sm transition-all disabled:opacity-60 ${
+                  bulkConfirm.nextState ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {isBulkToggling && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                {bulkConfirm.nextState ? `Đồng Ý Bật (${bulkConfirm.count} mã)` : `Đồng Ý Tắt (${bulkConfirm.count} mã)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DIALOG: XÁC NHẬN RESET CA (TẮT TẤT CẢ)                                    */}
       {/* ========================================================================= */}
       {isResetConfirmOpen && (
