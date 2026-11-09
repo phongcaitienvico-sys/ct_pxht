@@ -94,8 +94,60 @@ const PRODUCT_FIELD_MAP = {
   order_quantity: ['soluong', 'orderquantity', 'quantity', 'sl', 'soluongdonhang', 'soluongdat'],
   blank_quantity: ['phoi', 'blankquantity', 'phoico', 'slphoi', 'soluongphoi'],
   status: ['tt', 'status', 'trangthai', 'tinhtrang'],
-  is_active_today: ['isactivetoday', 'kichhoat', 'active', 'hoatdong', 'hoatdonghomnay']
+  is_active_today: ['isactivetoday', 'kichhoat', 'active', 'hoatdong', 'hoatdonghomnay'],
+  order_code: ['madonhang', 'madh', 'sodonhang', 'sodh', 'ordercode', 'orderno', 'ordernumber', 'donhang'],
+  ship_date: ['ngayxuathang', 'ngayxuat', 'ngayxh', 'ngaygiao', 'ngaygiaohang', 'hanxuat', 'hangiao', 'shipdate', 'deliverydate']
 };
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function isValidYmd(y, m, d) {
+  if (!(y >= 1900 && y <= 2200 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/**
+ * Chuẩn hóa Ngày xuất hàng về dạng 'YYYY-MM-DD' (hoặc null nếu trống / không hợp lệ).
+ * Hỗ trợ: ô ngày Excel (Date), số serial Excel, chuỗi 'DD/MM/YYYY', 'DD-MM-YYYY', 'YYYY-MM-DD'.
+ */
+export function normalizeShipDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    // Cộng 12h để tránh lệch ngày do múi giờ / sai số giây của SheetJS
+    const shifted = new Date(value.getTime() + 12 * 3600 * 1000);
+    return `${shifted.getFullYear()}-${pad2(shifted.getMonth() + 1)}-${pad2(shifted.getDate())}`;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value < 1 || value > 100000) return null;
+    const dt = new Date(Math.round((value - 25569) * 86400 * 1000));
+    return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+  }
+
+  const str = String(value).trim();
+  if (!str) return null;
+
+  let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(str);
+  if (m) {
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    return isValidYmd(y, mo, d) ? `${y}-${pad2(mo)}-${pad2(d)}` : null;
+  }
+
+  m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/.exec(str);
+  if (m) {
+    let y = Number(m[3]);
+    if (y < 100) y += 2000;
+    const [d, mo] = [Number(m[1]), Number(m[2])];
+    return isValidYmd(y, mo, d) ? `${y}-${pad2(mo)}-${pad2(d)}` : null;
+  }
+
+  return null;
+}
 
 /**
  * Chuẩn hóa tên công đoạn (giữ nguyên tiền tố số thứ tự như "01- ", "02- " theo file Excel)
@@ -351,6 +403,8 @@ export function parseProductExcel(data) {
       blank_quantity: blankQuantity,
       status,
       is_active_today: isActiveToday,
+      order_code: matched.order_code !== undefined && matched.order_code !== null ? String(matched.order_code).trim() : '',
+      ship_date: normalizeShipDate(matched.ship_date),
       operations: opsByIndex.sort((a, b) => a.n - b.n).map((o) => o.text)
     });
   });
@@ -659,6 +713,8 @@ export function generateProductTemplate(options = {}) {
       'Số lượng': 8,
       'Phôi': 3,
       'T.t': 'Sx',
+      'Mã đơn hàng': 'DH-2026-001',
+      'Ngày xuất hàng': '30/11/2026',
       'CD1': 'Mài đậu',
       'CD2': 'Hoàn thiện',
       'CD3': 'Nắn',
@@ -682,6 +738,8 @@ export function generateProductTemplate(options = {}) {
       'Số lượng': 2,
       'Phôi': 0,
       'T.t': 'Sx',
+      'Mã đơn hàng': 'DH-2026-001',
+      'Ngày xuất hàng': '30/11/2026',
       'CD1': 'Hoàn thiện',
       'CD2': 'Sơn',
       'CD3': 'Đóng thùng',
@@ -705,6 +763,8 @@ export function generateProductTemplate(options = {}) {
       'Số lượng': 100,
       'Phôi': 30,
       'T.t': 'Sx',
+      'Mã đơn hàng': 'DH-2026-001',
+      'Ngày xuất hàng': '30/11/2026',
       'CD1': 'Mài đậu',
       'CD2': 'Nắn',
       'CD3': '',
@@ -731,6 +791,8 @@ export function generateProductTemplate(options = {}) {
     { wch: 12 },
     { wch: 10 },
     { wch: 10 },
+    { wch: 16 },
+    { wch: 14 },
     { wch: 14 },
     { wch: 14 },
     { wch: 14 },
@@ -776,6 +838,7 @@ export function generateEmployeeTemplate(options = {}) {
 
 export default {
   normalizeColumnKey,
+  normalizeShipDate,
   parseProductExcel,
   parseEmployeeExcel,
   exportProductionReportToExcel,

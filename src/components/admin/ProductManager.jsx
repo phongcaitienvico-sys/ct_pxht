@@ -33,7 +33,8 @@ import {
   bulkToggleProducts,
   resetShiftProducts,
   validateProductInput,
-  normalizeSearchText
+  normalizeSearchText,
+  formatShipDate
 } from './productManagerLogic.js';
 
 import {
@@ -41,7 +42,8 @@ import {
   updateProductToggle,
   bulkUpdateProductToggle,
   upsertProducts,
-  deleteProduct
+  deleteProduct,
+  deleteAllProductsAndLogs
 } from '../../lib/supabase.js';
 
 import {
@@ -128,6 +130,8 @@ export default function ProductManager() {
     order_quantity: 0,
     blank_quantity: 0,
     status: 'Sx',
+    order_code: '',
+    ship_date: '',
     is_active_today: false,
     operations: []
   });
@@ -151,6 +155,12 @@ export default function ProductManager() {
 
   // Delete Confirm Dialog state
   const [deletingProductId, setDeletingProductId] = useState(null);
+
+  // Xóa toàn bộ danh mục (kèm toàn bộ nhật ký sản lượng)
+  const CLEAR_ALL_KEYWORD = 'XOA TAT CA';
+  const [isClearAllOpen, setIsClearAllOpen] = useState(false);
+  const [clearAllText, setClearAllText] = useState('');
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   // Show Toast helper
   const showToast = (type, message) => {
@@ -370,6 +380,8 @@ export default function ProductManager() {
       order_quantity: 0,
       blank_quantity: 0,
       status: 'Sx',
+      order_code: '',
+      ship_date: '',
       is_active_today: false,
       operations: []
     });
@@ -387,6 +399,8 @@ export default function ProductManager() {
       order_quantity: product.order_quantity || 0,
       blank_quantity: product.blank_quantity || 0,
       status: product.status || 'Sx',
+      order_code: product.order_code || '',
+      ship_date: product.ship_date ? String(product.ship_date).slice(0, 10) : '',
       is_active_today: Boolean(product.is_active_today),
       operations: Array.isArray(product.operations) ? [...product.operations] : []
     });
@@ -475,6 +489,34 @@ export default function ProductManager() {
     } catch (err) {
       console.error('Delete product error:', err);
       showToast('error', 'Lỗi khi xóa sản phẩm: ' + err.message);
+    }
+  };
+
+  const handleOpenClearAll = () => {
+    setClearAllText('');
+    setIsClearAllOpen(true);
+  };
+
+  const handleClearAll = async () => {
+    if (clearAllText.trim().toUpperCase() !== CLEAR_ALL_KEYWORD) return;
+    setIsClearingAll(true);
+    try {
+      const { deletedProducts, deletedLogs } = await deleteAllProductsAndLogs();
+      setProducts([]);
+      setSelectedIds(new Set());
+      setIsClearAllOpen(false);
+      setClearAllText('');
+      showToast(
+        'success',
+        `Đã xóa ${deletedProducts.toLocaleString('vi-VN')} sản phẩm và ${deletedLogs.toLocaleString('vi-VN')} bản ghi sản lượng. Bạn có thể Import Excel lại.`
+      );
+      await loadProducts(false);
+    } catch (err) {
+      console.error('Clear all products error:', err);
+      showToast('error', 'Lỗi khi xóa toàn bộ danh mục: ' + err.message);
+      loadProducts(false);
+    } finally {
+      setIsClearingAll(false);
     }
   };
 
@@ -622,6 +664,16 @@ export default function ProductManager() {
           </button>
 
           <button
+            onClick={handleOpenClearAll}
+            disabled={products.length === 0}
+            className="inline-flex items-center px-3.5 py-2 text-xs sm:text-sm font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors border border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Xóa toàn bộ danh mục sản phẩm và toàn bộ dữ liệu sản lượng đã nhập"
+          >
+            <Trash2 className="w-4 h-4 mr-1.5 text-rose-600" />
+            Xóa Toàn Bộ
+          </button>
+
+          <button
             onClick={() => loadProducts(false)}
             disabled={refreshing}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors"
@@ -681,7 +733,7 @@ export default function ProductManager() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm theo tên sản phẩm hoặc khách hàng..."
+              placeholder="Tìm theo tên, mã sản phẩm, mã đơn hàng hoặc khách hàng..."
               className="w-full pl-10 pr-9 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800 placeholder-slate-400"
             />
             {searchTerm && (
@@ -892,6 +944,8 @@ export default function ProductManager() {
                   <th className="py-3.5 px-3 text-center w-36">Bật/Tắt Hôm Nay</th>
                   <th className="py-3.5 px-3">Tên Sản Phẩm</th>
                   <th className="py-3.5 px-3">Khách Hàng</th>
+                  <th className="py-3.5 px-3">Mã Đơn Hàng</th>
+                  <th className="py-3.5 px-3 whitespace-nowrap">Ngày Xuất</th>
                   <th className="py-3.5 px-3 text-right">SL Đơn</th>
                   <th className="py-3.5 px-3 text-right">SL Phôi</th>
                   <th className="py-3.5 pr-4 pl-3 text-center w-24">Hành Động</th>
@@ -961,6 +1015,26 @@ export default function ProductManager() {
                         {prod.customer ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                             {prod.customer}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic text-xs">—</span>
+                        )}
+                      </td>
+
+                      {/* Order Code */}
+                      <td className="py-3.5 px-3">
+                        {prod.order_code ? (
+                          <span className="font-mono text-xs font-semibold text-slate-700">{prod.order_code}</span>
+                        ) : (
+                          <span className="text-slate-400 italic text-xs">—</span>
+                        )}
+                      </td>
+
+                      {/* Ship Date */}
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        {prod.ship_date ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                            {formatShipDate(prod.ship_date)}
                           </span>
                         ) : (
                           <span className="text-slate-400 italic text-xs">—</span>
@@ -1043,6 +1117,16 @@ export default function ProductManager() {
                         <span className="text-xs text-slate-500">
                           Đơn: <strong className="text-slate-800">{prod.order_quantity || 0}</strong> • Phôi: <strong className="text-slate-800">{prod.blank_quantity || 0}</strong>
                         </span>
+                        {prod.order_code && (
+                          <span className="text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">
+                            ĐH: {prod.order_code}
+                          </span>
+                        )}
+                        {prod.ship_date && (
+                          <span className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-medium">
+                            Xuất: {formatShipDate(prod.ship_date)}
+                          </span>
+                        )}
                       </div>
                       <OperationChips operations={prod.operations} />
                     </div>
@@ -1246,6 +1330,43 @@ export default function ProductManager() {
                 </div>
               </div>
 
+              {/* Order Code & Ship Date Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mã Đơn Hàng
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.order_code || ''}
+                    onChange={(e) => setFormData({ ...formData, order_code: e.target.value })}
+                    placeholder="Ví dụ: DH-2026-001"
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Ngày Xuất Hàng
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.ship_date || ''}
+                    onChange={(e) => {
+                      setFormData({ ...formData, ship_date: e.target.value });
+                      if (formErrors.ship_date) setFormErrors({ ...formErrors, ship_date: null });
+                    }}
+                    className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 text-slate-800 ${
+                      formErrors.ship_date
+                        ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                        : 'border-slate-200 focus:ring-blue-500/20 focus:border-blue-500'
+                    }`}
+                  />
+                  {formErrors.ship_date && (
+                    <p className="text-xs text-rose-600 mt-1">{formErrors.ship_date}</p>
+                  )}
+                </div>
+              </div>
+
               {/* Operations */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -1440,6 +1561,8 @@ export default function ProductManager() {
                           <th className="py-2 px-3">Khách hàng</th>
                           <th className="py-2 px-3 text-right">SL Đơn</th>
                           <th className="py-2 px-3 text-right">SL Phôi</th>
+                          <th className="py-2 px-3">Mã ĐH</th>
+                          <th className="py-2 px-3">Ngày xuất</th>
                           <th className="py-2 px-3">Công đoạn</th>
                         </tr>
                       </thead>
@@ -1451,6 +1574,8 @@ export default function ProductManager() {
                             <td className="py-1.5 px-3 text-slate-600">{row.customer || '—'}</td>
                             <td className="py-1.5 px-3 text-right">{row.order_quantity}</td>
                             <td className="py-1.5 px-3 text-right">{row.blank_quantity}</td>
+                            <td className="py-1.5 px-3 font-mono">{row.order_code || '—'}</td>
+                            <td className="py-1.5 px-3 whitespace-nowrap">{row.ship_date ? formatShipDate(row.ship_date) : '—'}</td>
                             <td className="py-1.5 px-3">
                               {Array.isArray(row.operations) && row.operations.length > 0 ? (
                                 <div className="flex flex-wrap items-center gap-1">
@@ -1579,6 +1704,69 @@ export default function ProductManager() {
               >
                 {isResetting && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
                 Đồng Ý Tắt Tất Cả
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* DIALOG: XÁC NHẬN XÓA TOÀN BỘ DANH MỤC + NHẬT KÝ SẢN LƯỢNG                  */}
+      {/* ========================================================================= */}
+      {isClearAllOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-rose-200 p-6 space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-rose-50 rounded-xl border border-rose-100">
+                <AlertTriangle className="w-6 h-6 text-rose-600" />
+              </div>
+              <h3 className="font-bold text-lg text-slate-900">Xóa Toàn Bộ Danh Mục Sản Phẩm</h3>
+            </div>
+            <div className="text-sm text-slate-600 leading-relaxed space-y-2">
+              <p>Hành động này sẽ <span className="font-semibold text-rose-600">XÓA VĨNH VIỄN</span>:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  Toàn bộ <span className="font-bold text-slate-900">{products.length.toLocaleString('vi-VN')}</span> mã sản phẩm trong danh mục
+                </li>
+                <li>
+                  Toàn bộ <span className="font-semibold">dữ liệu sản lượng đã nhập</span> (Giám sát, Báo cáo, Lịch sử nhập liệu — kể cả công nhật)
+                </li>
+              </ul>
+              <p className="text-xs text-slate-500">Danh sách nhân viên và tài khoản không bị ảnh hưởng. Không thể hoàn tác.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Gõ <span className="font-mono text-rose-600">{CLEAR_ALL_KEYWORD}</span> để xác nhận
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={clearAllText}
+                onChange={(e) => setClearAllText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleClearAll();
+                }}
+                placeholder={CLEAR_ALL_KEYWORD}
+                className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-800 font-mono"
+              />
+            </div>
+            <div className="pt-2 flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                disabled={isClearingAll}
+                onClick={() => setIsClearAllOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={isClearingAll || clearAllText.trim().toUpperCase() !== CLEAR_ALL_KEYWORD}
+                onClick={handleClearAll}
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isClearingAll && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                Xóa Vĩnh Viễn
               </button>
             </div>
           </div>

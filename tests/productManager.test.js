@@ -9,7 +9,8 @@ import {
   toggleSingleProduct,
   bulkToggleProducts,
   resetShiftProducts,
-  validateProductInput
+  validateProductInput,
+  formatShipDate
 } from '../src/components/admin/productManagerLogic.js';
 
 console.log('Running tests/productManager.test.js...\n');
@@ -342,6 +343,29 @@ async function runProductManagerTests() {
     assert.ok(tooMany.errors.operations);
     assert.strictEqual(tooMany.sanitized.operations.length, 30);
     console.log('✔ validateProductInput operations passed');
+  }
+
+  // Mã đơn hàng & Ngày xuất hàng
+  {
+    const v = validateProductInput({ name: 'A', order_code: ' DH-9 ', ship_date: '2026-11-30' });
+    assert.strictEqual(v.sanitized.order_code, 'DH-9');
+    assert.strictEqual(v.sanitized.ship_date, '2026-11-30');
+    const empty = validateProductInput({ name: 'A' });
+    assert.strictEqual(empty.sanitized.order_code, '');
+    assert.strictEqual(empty.sanitized.ship_date, null);
+    const bad = validateProductInput({ name: 'A', ship_date: 'xyz' });
+    assert.strictEqual(bad.valid, false);
+    assert.ok(bad.errors.ship_date);
+
+    const list = [
+      { id: '1', name: 'X', customer: 'K', order_code: 'DH-777' },
+      { id: '2', name: 'Y', customer: 'K', order_code: '' }
+    ];
+    const found = filterProducts(list, { searchTerm: 'dh-777' });
+    assert.deepStrictEqual(found.map((p) => p.id), ['1']);
+    assert.strictEqual(formatShipDate('2026-11-05'), '05/11/2026');
+    assert.strictEqual(formatShipDate(null), '');
+    console.log('✔ order_code & ship_date logic passed');
   }
 
   console.log('🎉 ALL PRODUCT MANAGER TESTS PASSED SUCCESSFULLY!');

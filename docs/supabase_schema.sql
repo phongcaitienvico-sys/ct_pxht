@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS products (
   order_quantity INTEGER DEFAULT 0, -- Số lượng kế hoạch theo đơn
   blank_quantity INTEGER DEFAULT 0, -- Số lượng phôi
   status TEXT DEFAULT 'Sx', -- Trạng thái sản xuất: 'Sx', 'Tạm dừng', 'Hoàn thành'
+  order_code TEXT NOT NULL DEFAULT '', -- Mã đơn hàng
+  ship_date DATE, -- Ngày xuất hàng
   operations JSONB NOT NULL DEFAULT '[]'::jsonb, -- Danh sách công đoạn (tối đa 10), ví dụ: ["Mài đậu","Sơn"]
   is_active_today BOOLEAN DEFAULT FALSE, -- Cờ kích hoạt làm hôm nay (Admin điều khiển)
   updated_at TIMESTAMPTZ DEFAULT NOW()

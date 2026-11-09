@@ -37,7 +37,8 @@ const KEYS = {
   TEAMS: 'pxht_teams',
   EMPLOYEES: 'pxht_employees',
   LOGS: 'pxht_production_logs',
-  ACCOUNTS: 'pxht_accounts'
+  ACCOUNTS: 'pxht_accounts',
+  CLEARED: 'pxht_demo_cleared'
 };
 
 const memoryStore = {};
@@ -118,6 +119,7 @@ export async function resetDemoData() {
   const dynamicLogs = typeof getDynamicSeedLogs === 'function' ? getDynamicSeedLogs() : seedLogs;
   setStore(KEYS.LOGS, dynamicLogs);
   setStore('pxht_demo_version', DEMO_DATA_VERSION);
+  setStore(KEYS.CLEARED, false);
   return {
     products: seedProducts,
     teams: seedTeams,
@@ -133,6 +135,8 @@ export const DEMO_DATA_VERSION = 'pxht-seed-v5-operations';
 
 export async function initDemoData() {
   const version = getStore('pxht_demo_version', null);
+  // Người dùng đã chủ động xóa toàn bộ danh mục -> không tự nạp lại dữ liệu mẫu
+  if (version === DEMO_DATA_VERSION && getStore(KEYS.CLEARED, false)) return;
   const existingProducts = getStore(KEYS.PRODUCTS, null);
   const existingLogs = getStore(KEYS.LOGS, null);
 
@@ -314,6 +318,18 @@ export async function upsertProducts(productsArray) {
         order_quantity: Number(item.order_quantity) || 0,
         blank_quantity: Number(item.blank_quantity) || 0,
         status: item.status || 'Sx',
+        order_code:
+          item.order_code !== undefined
+            ? String(item.order_code ?? '').trim()
+            : existing
+            ? existing.order_code || ''
+            : '',
+        ship_date:
+          item.ship_date !== undefined
+            ? item.ship_date || null
+            : existing
+            ? existing.ship_date || null
+            : null,
         operations:
           item.operations !== undefined
             ? normalizeOperations(item.operations)
@@ -350,6 +366,12 @@ export async function upsertProducts(productsArray) {
     if (item.operations !== undefined) {
       row.operations = normalizeOperations(item.operations);
     }
+    if (item.order_code !== undefined) {
+      row.order_code = String(item.order_code ?? '').trim();
+    }
+    if (item.ship_date !== undefined) {
+      row.ship_date = item.ship_date || null;
+    }
     dedupedMap.set(id, row);
   }
 
@@ -366,6 +388,12 @@ export async function upsertProducts(productsArray) {
 
     if (error) {
       console.error('upsertProducts error:', error);
+      const msg = String(error.message || '');
+      if (/order_code|ship_date/.test(msg)) {
+        throw new Error(
+          'CSDL chưa có cột Mã đơn hàng / Ngày xuất hàng. Vui lòng chạy file docs/migration_2026_order_ship.sql trong Supabase SQL Editor rồi thử lại.'
+        );
+      }
       throw error;
     }
     if (data) {
@@ -397,6 +425,47 @@ export async function deleteProduct(id) {
     throw error;
   }
   return true;
+}
+
+/**
+ * Xóa TOÀN BỘ danh mục sản phẩm và TOÀN BỘ nhật ký sản lượng (giám sát / báo cáo)
+ * Dùng khi Quản đốc muốn làm sạch để import lại danh mục mới.
+ * Nhật ký phải xóa trước vì production_logs.product_id tham chiếu products (ON DELETE RESTRICT).
+ * @returns {Promise<{ deletedProducts: number, deletedLogs: number }>}
+ */
+export async function deleteAllProductsAndLogs() {
+  if (isDemoMode()) {
+    await ensureDemoInitialized();
+    const logs = getStore(KEYS.LOGS, []);
+    const products = getStore(KEYS.PRODUCTS, []);
+    setStore(KEYS.LOGS, []);
+    setStore(KEYS.PRODUCTS, []);
+    setStore(KEYS.CLEARED, true);
+    for (const old of logs) {
+      notifySubscribers({ eventType: 'DELETE', new: null, old });
+    }
+    return { deletedProducts: products.length, deletedLogs: logs.length };
+  }
+
+  const { error: logsError, count: deletedLogs } = await supabase
+    .from('production_logs')
+    .delete({ count: 'exact' })
+    .not('id', 'is', null);
+  if (logsError) {
+    console.error('deleteAllProductsAndLogs (logs) error:', logsError);
+    throw logsError;
+  }
+
+  const { error: prodError, count: deletedProducts } = await supabase
+    .from('products')
+    .delete({ count: 'exact' })
+    .not('id', 'is', null);
+  if (prodError) {
+    console.error('deleteAllProductsAndLogs (products) error:', prodError);
+    throw prodError;
+  }
+
+  return { deletedProducts: deletedProducts || 0, deletedLogs: deletedLogs || 0 };
 }
 
 // ==============================================================================

@@ -6,7 +6,8 @@ import {
   exportProductionReportToExcel,
   generateProductTemplate,
   generateEmployeeTemplate,
-  normalizeColumnKey
+  normalizeColumnKey,
+  normalizeShipDate
 } from '../src/lib/excel.js';
 
 console.log('Running tests/excel.test.js...\n');
@@ -331,6 +332,41 @@ async function runExcelTests() {
   const noTeamEmps = parseEmployeeExcel(createExcelBuffer('E', [{ 'Mã NV': 'X1', 'Họ và tên': 'A' }]));
   assert.strictEqual(noTeamEmps.length, 1);
   console.log('✔ generateProductTemplate and generateEmployeeTemplate passed');
+
+  // Mã đơn hàng & Ngày xuất hàng
+  {
+    const buf = createExcelBuffer('SP', [
+      { 'Mã SP': 'A1', 'Tên sản phẩm': 'SP A', 'Mã đơn hàng': 'DH-001', 'Ngày xuất hàng': '15/11/2026' },
+      { 'Mã SP': 'A2', 'Tên sản phẩm': 'SP B', 'Số đơn hàng': 2025, 'Ngày xuất': '2026-12-01' },
+      { 'Mã SP': 'A3', 'Tên sản phẩm': 'SP C' }
+    ]);
+    const rows = parseProductExcel(buf);
+    assert.strictEqual(rows[0].order_code, 'DH-001');
+    assert.strictEqual(rows[0].ship_date, '2026-11-15');
+    assert.strictEqual(rows[1].order_code, '2025');
+    assert.strictEqual(rows[1].ship_date, '2026-12-01');
+    assert.strictEqual(rows[2].order_code, '');
+    assert.strictEqual(rows[2].ship_date, null);
+
+    // Ô ngày thật trong Excel (kiểu Date)
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Mã SP', 'Tên sản phẩm', 'Ngày xuất hàng'],
+      ['D1', 'SP D', new Date(2026, 10, 20)]
+    ], { cellDates: true });
+    XLSX.utils.book_append_sheet(wb, ws, 'SP');
+    const dateRows = parseProductExcel(XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' }));
+    assert.strictEqual(dateRows[0].ship_date, '2026-11-20');
+
+    assert.strictEqual(normalizeShipDate('5/1/2027'), '2027-01-05');
+    assert.strictEqual(normalizeShipDate('abc'), null);
+    assert.strictEqual(normalizeShipDate(''), null);
+
+    const tplRows = XLSX.utils.sheet_to_json(XLSX.read(generateProductTemplate({ returnBuffer: true }), { type: 'buffer' }).Sheets['Danh_Muc_SP']);
+    assert.ok('Mã đơn hàng' in tplRows[0], 'Template has Mã đơn hàng column');
+    assert.ok('Ngày xuất hàng' in tplRows[0], 'Template has Ngày xuất hàng column');
+    console.log('✔ parseProductExcel order_code & ship_date passed');
+  }
 
   console.log('\n=========================================');
   console.log('🎉 ALL EXCEL SERVICE TESTS PASSED SUCCESSFULLY!');

@@ -6,6 +6,15 @@
 export const MAX_OPERATIONS = 30;
 
 /**
+ * Hiển thị Ngày xuất hàng dạng DD/MM/YYYY từ 'YYYY-MM-DD'
+ */
+export function formatShipDate(value) {
+  if (!value) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(value);
+}
+
+/**
  * Remove Vietnamese accents / diacritics and normalize search string
  */
 export function normalizeSearchText(str) {
@@ -85,9 +94,11 @@ export function filterProducts(products = [], { searchTerm = '', customerFilter 
       const nameNorm = normalizeSearchText(p.name);
       const custNorm = normalizeSearchText(p.customer);
       const opsNorm = normalizeSearchText(Array.isArray(p.operations) ? p.operations.join(' ') : '');
+      const orderNorm = normalizeSearchText(p.order_code);
 
       const matchesQuery =
         opsNorm.includes(query) ||
+        orderNorm.includes(query) ||
         idNorm.includes(query) ||
         nameNorm.includes(query) ||
         custNorm.includes(query);
@@ -276,6 +287,26 @@ export function validateProductInput(productData = {}) {
 
   const generatedId = rawId || `SP_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
+  // Mã đơn hàng (tùy chọn)
+  const orderCode = productData?.order_code !== undefined && productData?.order_code !== null
+    ? String(productData.order_code).trim()
+    : '';
+
+  // Ngày xuất hàng (tùy chọn, định dạng YYYY-MM-DD từ ô chọn ngày)
+  let shipDate = null;
+  const rawShip = productData?.ship_date !== undefined && productData?.ship_date !== null
+    ? String(productData.ship_date).trim()
+    : '';
+  if (rawShip) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(rawShip);
+    const dt = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+    if (m && dt && dt.getUTCDate() === Number(m[3]) && dt.getUTCMonth() === Number(m[2]) - 1) {
+      shipDate = rawShip;
+    } else {
+      errors.ship_date = 'Ngày xuất hàng không hợp lệ';
+    }
+  }
+
   const sanitized = {
     id: generatedId,
     name: rawName,
@@ -283,6 +314,8 @@ export function validateProductInput(productData = {}) {
     order_quantity: orderQty,
     blank_quantity: blankQty,
     status: rawStatus || 'Sx',
+    order_code: orderCode,
+    ship_date: shipDate,
     operations: operations.slice(0, MAX_OPERATIONS),
     is_active_today: Boolean(productData?.is_active_today)
   };

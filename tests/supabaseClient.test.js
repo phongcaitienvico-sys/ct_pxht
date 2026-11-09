@@ -13,7 +13,8 @@ import {
   getProductionLogs,
   updateProductionLog,
   deleteProductionLog,
-  subscribeToLogs
+  subscribeToLogs,
+  deleteAllProductsAndLogs
 } from '../src/lib/supabase.js';
 
 console.log('Running tests/supabaseClient.test.js...\n');
@@ -180,6 +181,22 @@ async function runTests() {
   ]);
   assert.strictEqual(noOpLog.operation, '');
   console.log('✔ production log operation passed');
+
+  // Mã đơn hàng & Ngày xuất hàng được lưu cùng sản phẩm
+  await upsertProducts([{ id: 'OC1', name: 'SP OC', customer: 'K', order_code: 'DH-01', ship_date: '2026-11-30' }]);
+  const oc = (await getProducts()).find((p) => p.id === 'OC1');
+  assert.strictEqual(oc.order_code, 'DH-01');
+  assert.strictEqual(oc.ship_date, '2026-11-30');
+  console.log('✔ product order_code & ship_date passed');
+
+  // Xóa toàn bộ danh mục sản phẩm + toàn bộ nhật ký sản lượng
+  const before = await getProductionLogs();
+  assert.ok(before.length > 0, 'Should have logs before clearing');
+  const result = await deleteAllProductsAndLogs();
+  assert.ok(result.deletedProducts > 0);
+  assert.strictEqual((await getProducts()).length, 0, 'All products deleted');
+  assert.strictEqual((await getProductionLogs()).length, 0, 'All production logs deleted');
+  console.log('✔ deleteAllProductsAndLogs passed');
 
   unsubscribe();
   console.log('\nAll Supabase client adapter tests passed successfully!');
