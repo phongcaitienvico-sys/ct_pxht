@@ -133,13 +133,19 @@ export default function LeaderDailyLogs({
       const prodName = (log.product_name || log.products?.name || '').toLowerCase();
       const prodId = String(log.product_id || '').toLowerCase();
       const customer = (log.customer || log.products?.customer || '').toLowerCase();
+      const orderCode = (log.order_code || log.products?.order_code || '').toLowerCase();
+      const rawShipDate = log.ship_date || log.products?.ship_date || '';
+      const shipDateDisplay = rawShipDate ? formatDateDisplay(rawShipDate).toLowerCase() : '';
 
       return (
         empName.includes(query) ||
         empCode.includes(query) ||
         prodName.includes(query) ||
         prodId.includes(query) ||
-        customer.includes(query)
+        customer.includes(query) ||
+        orderCode.includes(query) ||
+        String(rawShipDate).toLowerCase().includes(query) ||
+        shipDateDisplay.includes(query)
       );
     });
   }, [dateLogs, searchQuery]);
@@ -419,7 +425,7 @@ export default function LeaderDailyLogs({
             </div>
             <input
               type="text"
-              placeholder="Tìm theo tên thợ, mã sản phẩm hoặc khách hàng..."
+              placeholder="Tìm theo tên thợ, mã SP, mã đơn/PO, ngày đi hoặc khách hàng..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all"
@@ -530,6 +536,8 @@ export default function LeaderDailyLogs({
                         ? (log.operation || log.daily_work || (log.notes ? `[Ghi chú] ${log.notes}` : 'Công nhật'))
                         : (log.product_name || log.products?.name || 'Sản phẩm');
                       const customer = isDaily ? '' : (log.customer || log.products?.customer || '');
+                      const orderCode = isDaily ? '' : (log.order_code || log.products?.order_code || '');
+                      const shipDate = isDaily ? '' : (log.ship_date || log.products?.ship_date || '');
 
                       return (
                         <div
@@ -554,6 +562,16 @@ export default function LeaderDailyLogs({
                               {log.operation && !isDaily && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                                   Công đoạn: {log.operation}
+                                </span>
+                              )}
+                              {orderCode && (
+                                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">
+                                  PO: {orderCode}
+                                </span>
+                              )}
+                              {shipDate && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                                  Đi: {formatDateDisplay(shipDate)}
                                 </span>
                               )}
                             </div>

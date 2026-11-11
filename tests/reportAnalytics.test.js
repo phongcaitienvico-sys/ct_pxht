@@ -448,6 +448,15 @@ runTest('filterLogsByCriteria search matches operation', () => {
   assert.strictEqual(filterLogsByCriteria(logs, { search: 'thùng' }).length, 1);
 });
 
+runTest('filterLogsByCriteria search matches order_code and ship_date', () => {
+  const logs = [
+    { log_date: '2026-11-10', product_id: '1', product_name: 'ALKTOP 1130H', order_code: 'PO 487', ship_date: '2026-11-11', quantity: 23 },
+    { log_date: '2026-11-10', product_id: '2', product_name: 'ALKTOP 1335M', order_code: '', ship_date: null, quantity: 5 }
+  ];
+  assert.strictEqual(filterLogsByCriteria(logs, { search: 'PO 487' }).length, 1);
+  assert.strictEqual(filterLogsByCriteria(logs, { search: '11/11/2026' }).length, 1);
+});
+
 console.log(`\n========================================`);
 console.log(`Summary: ${passed} passed, ${failed} failed`);
 console.log(`========================================\n`);

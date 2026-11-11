@@ -290,7 +290,7 @@ async function runExcelTests() {
       duration_hours: 5,
       notes: 'Nested relations test',
       employees: { code: 'NV05', full_name: 'Hoàng Đức Tuấn' },
-      products: { id: '1790', name: 'Cánh búa 395', customer: 'Đại Phú' },
+      products: { id: '1790', name: 'Cánh búa 395', customer: 'Đại Phú', order_code: 'PO 487', ship_date: '2026-11-11' },
       teams: { name: 'Tổ 2 - Tiện & Phay' }
     }
   ];
@@ -301,6 +301,8 @@ async function runExcelTests() {
   assert.strictEqual(relSheet1[0]['Tên NV'], 'Hoàng Đức Tuấn');
   assert.strictEqual(relSheet1[0]['Mã SP'], '1790');
   assert.strictEqual(relSheet1[0]['Khách hàng'], 'Đại Phú');
+  assert.strictEqual(relSheet1[0]['Mã đơn hàng'], 'PO 487');
+  assert.strictEqual(relSheet1[0]['Ngày xuất hàng'], '11/11/2026');
   console.log('✔ exportProductionReportToExcel handles nested relation objects');
 
   // =========================================================================

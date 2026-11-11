@@ -164,9 +164,14 @@ export function filterLogs(logs = [], { teamId = 'all', searchTerm = '', date = 
       const teamName = normalizeSearchText(log.team_name || (log.teams && log.teams.name) || '');
       const notes = normalizeSearchText(log.notes || '');
       const operation = normalizeSearchText(log.operation || '');
+      const orderCode = normalizeSearchText(log.order_code || (log.products && log.products.order_code) || '');
+      const rawShip = log.ship_date || (log.products && log.products.ship_date) || '';
+      const shipDateText = normalizeSearchText(`${rawShip} ${formatShipDateVN(rawShip)}`);
 
       const matches =
         operation.includes(query) ||
+        orderCode.includes(query) ||
+        shipDateText.includes(query) ||
         empName.includes(query) ||
         empCode.includes(query) ||
         prodName.includes(query) ||
@@ -291,6 +296,52 @@ export function validateLogInput(input = {}) {
   };
 }
 
+/**
+ * Định dạng Ngày đi / Ngày xuất hàng từ 'YYYY-MM-DD' sang 'DD/MM/YYYY'
+ */
+export function formatShipDateVN(value) {
+  if (!value) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value).trim());
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(value).trim();
+}
+
+/**
+ * Bổ sung thông tin sản phẩm (tên, khách hàng, PO/mã đơn hàng, ngày đi) từ danh mục products
+ * Đảm bảo bản ghi realtime vừa bắn về luôn có đủ PO & ngày đi kể cả khi payload chưa join bảng products
+ */
+export function enrichLogsWithProducts(logs = [], products = []) {
+  if (!Array.isArray(logs)) return [];
+  const productMap = new Map();
+  if (Array.isArray(products)) {
+    for (const p of products) {
+      if (p && p.id !== undefined && p.id !== null) {
+        productMap.set(String(p.id), p);
+      }
+    }
+  }
+
+  return logs.map((log) => {
+    if (!log) return log;
+    const pid = log.product_id || (log.products && log.products.id) || null;
+    const isDaily = !pid || Boolean(log.is_daily_work);
+    if (isDaily) {
+      return {
+        ...log,
+        order_code: '',
+        ship_date: null
+      };
+    }
+    const matched = log.products || productMap.get(String(pid)) || null;
+    return {
+      ...log,
+      product_name: log.product_name || (matched && matched.name) || '',
+      customer: log.customer || (matched && matched.customer) || '',
+      order_code: log.order_code || (matched && matched.order_code) || '',
+      ship_date: log.ship_date || (matched && matched.ship_date) || null
+    };
+  });
+}
+
 export default {
   normalizeSearchText,
   getTodayDateString,
@@ -298,5 +349,7 @@ export default {
   filterLogs,
   handleRealtimeEvent,
   formatLogTime,
-  validateLogInput
+  validateLogInput,
+  formatShipDateVN,
+  enrichLogsWithProducts
 };

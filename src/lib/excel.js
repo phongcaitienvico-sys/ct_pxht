@@ -573,6 +573,10 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     const isDaily = !prodId || Boolean(log.is_daily_work);
     const prodName = isDaily ? '' : (log.product_name || (log.products && log.products.name) || '');
     const customer = isDaily ? '' : (log.customer || (log.products && log.products.customer) || '');
+    const orderCode = isDaily ? '' : (log.order_code || (log.products && log.products.order_code) || '');
+    const rawShipDate = isDaily ? '' : (log.ship_date || (log.products && log.products.ship_date) || '');
+    const shipDateMatch = rawShipDate ? /^(\d{4})-(\d{2})-(\d{2})/.exec(String(rawShipDate).trim()) : null;
+    const shipDateStr = shipDateMatch ? `${shipDateMatch[3]}/${shipDateMatch[2]}/${shipDateMatch[1]}` : String(rawShipDate || '');
     const operation = isDaily ? '' : (log.operation || '');
     const dailyWork = isDaily ? (log.operation || log.daily_work || '') : '';
     const qty = Number(log.quantity) || 0;
@@ -586,6 +590,8 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
       'Mã SP': prodId,
       'Tên SP': prodName,
       'Khách hàng': customer,
+      'Mã đơn hàng': orderCode,
+      'Ngày xuất hàng': shipDateStr,
       'Công đoạn': operation,
       'Công nhật': dailyWork,
       'Số lượng': qty,
@@ -596,7 +602,7 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
 
   const wsDetail = XLSX.utils.json_to_sheet(
     detailRows.length > 0 ? detailRows : [
-      { 'Ngày': '', 'Mã NV': '', 'Tên NV': '', 'Mã SP': '', 'Tên SP': '', 'Khách hàng': '', 'Công đoạn': '', 'Công nhật': '', 'Số lượng': '', 'Số giờ': '', 'Ghi chú': '' }
+      { 'Ngày': '', 'Mã NV': '', 'Tên NV': '', 'Mã SP': '', 'Tên SP': '', 'Khách hàng': '', 'Mã đơn hàng': '', 'Ngày xuất hàng': '', 'Công đoạn': '', 'Công nhật': '', 'Số lượng': '', 'Số giờ': '', 'Ghi chú': '' }
     ]
   );
 
@@ -607,6 +613,8 @@ export function exportProductionReportToExcel(logs = [], options = {}) {
     { wch: 10 }, // Mã SP
     { wch: 35 }, // Tên SP
     { wch: 20 }, // Khách hàng
+    { wch: 16 }, // Mã đơn hàng
+    { wch: 14 }, // Ngày xuất hàng
     { wch: 16 }, // Công đoạn
     { wch: 25 }, // Công nhật
     { wch: 12 }, // Số lượng

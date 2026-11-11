@@ -182,12 +182,26 @@ async function runTests() {
   assert.strictEqual(noOpLog.operation, '');
   console.log('✔ production log operation passed');
 
-  // Mã đơn hàng & Ngày xuất hàng được lưu cùng sản phẩm
-  await upsertProducts([{ id: 'OC1', name: 'SP OC', customer: 'K', order_code: 'DH-01', ship_date: '2026-11-30' }]);
+  // Mã đơn hàng & Ngày xuất hàng được lưu cùng sản phẩm và truyền sang nhật ký sản lượng
+  await upsertProducts([{ id: 'OC1', name: 'SP OC', customer: 'K', order_code: 'PO 487', ship_date: '2026-11-11' }]);
   const oc = (await getProducts()).find((p) => p.id === 'OC1');
-  assert.strictEqual(oc.order_code, 'DH-01');
-  assert.strictEqual(oc.ship_date, '2026-11-30');
-  console.log('✔ product order_code & ship_date passed');
+  assert.strictEqual(oc.order_code, 'PO 487');
+  assert.strictEqual(oc.ship_date, '2026-11-11');
+
+  const [ocLog] = await submitProductionLogs([
+    { employee_id: team1Employees[0].id, product_id: 'OC1', quantity: 23, duration_hours: 3, operation: '02- Hoàn thiện' }
+  ]);
+  assert.strictEqual(ocLog.order_code, 'PO 487', 'submitProductionLogs should attach order_code');
+  assert.strictEqual(ocLog.ship_date, '2026-11-11', 'submitProductionLogs should attach ship_date');
+
+  const fetchedOcLog = (await getProductionLogs()).find((l) => l.id === ocLog.id);
+  assert.strictEqual(fetchedOcLog.order_code, 'PO 487', 'getProductionLogs should attach order_code');
+  assert.strictEqual(fetchedOcLog.ship_date, '2026-11-11', 'getProductionLogs should attach ship_date');
+
+  const updatedOcLog = await updateProductionLog(ocLog.id, { quantity: 25 });
+  assert.strictEqual(updatedOcLog.order_code, 'PO 487', 'updateProductionLog should preserve order_code');
+  assert.strictEqual(updatedOcLog.ship_date, '2026-11-11', 'updateProductionLog should preserve ship_date');
+  console.log('✔ product & production log order_code & ship_date passed');
 
   // Xóa toàn bộ danh mục sản phẩm + toàn bộ nhật ký sản lượng
   const before = await getProductionLogs();

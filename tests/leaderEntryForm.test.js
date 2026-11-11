@@ -304,6 +304,11 @@ console.log('\n--- Test Suite 6: formatProductLabel & calculateFormTotals ---');
     formatProductLabel(p2),
     '[#1733] Ống gối bi'
   );
+  const p3 = { id: '1', name: 'ALKTOP 1130H', customer: 'Win win', order_code: 'PO 487', ship_date: '2026-11-11' };
+  assert.strictEqual(
+    formatProductLabel(p3),
+    '[#1] ALKTOP 1130H (Win win) • PO: PO 487 • Đi: 11/11/2026'
+  );
 
   const totals = calculateFormTotals([
     { product_id: '1732', quantity: 5, duration_hours: 3.5 },

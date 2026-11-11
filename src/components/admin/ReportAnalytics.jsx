@@ -41,6 +41,7 @@ import {
   formatFullDateVN,
   formatNumber
 } from './reportAnalyticsLogic.js';
+import { enrichLogsWithProducts } from './realtimeFeedLogic.js';
 
 export default function ReportAnalytics() {
   // Master data & logs
@@ -146,15 +147,20 @@ export default function ReportAnalytics() {
     return employees.find((e) => e.id === selectedEmployeeId || e.code === selectedEmployeeId) || null;
   }, [employees, selectedEmployeeId]);
 
+  // Enrich logs with product catalog info (order_code, ship_date, customer, name)
+  const enrichedLogs = useMemo(() => {
+    return enrichLogsWithProducts(logs, products);
+  }, [logs, products]);
+
   // Filtered Logs
   const filteredLogs = useMemo(() => {
-    return filterLogsByCriteria(logs, {
+    return filterLogsByCriteria(enrichedLogs, {
       startDate,
       endDate,
       employeeId: selectedEmployeeId,
       search: searchQuery
     });
-  }, [logs, startDate, endDate, selectedEmployeeId, searchQuery]);
+  }, [enrichedLogs, startDate, endDate, selectedEmployeeId, searchQuery]);
 
   // Calculated KPI summary metrics
   const kpi = useMemo(() => {
@@ -368,7 +374,7 @@ export default function ReportAnalytics() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Mã SP, tên SP, khách..."
+                  placeholder="Mã SP, tên SP, mã đơn/PO, ngày đi, khách..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 placeholder-slate-400"
@@ -628,6 +634,8 @@ export default function ReportAnalytics() {
                           <th className="px-6 py-3">Mã #ID</th>
                           <th className="px-6 py-3">Tên sản phẩm / Công nhật</th>
                           <th className="px-6 py-3">Khách hàng</th>
+                          <th className="px-6 py-3 whitespace-nowrap">Mã Đơn / PO</th>
+                          <th className="px-6 py-3 whitespace-nowrap">Ngày Đi</th>
                           <th className="px-6 py-3">Công đoạn / Công nhật</th>
                           <th className="px-6 py-3 text-right">Số lượng</th>
                           <th className="px-6 py-3 text-right">Thời gian</th>
@@ -638,6 +646,12 @@ export default function ReportAnalytics() {
                       <tbody className="divide-y divide-slate-100 text-slate-700">
                         {group.logs.map((log, idx) => {
                           const isDaily = !log.product_id || Boolean(log.is_daily_work);
+                          const orderCode = isDaily
+                            ? ''
+                            : log.order_code || (log.products && log.products.order_code) || '';
+                          const shipDate = isDaily
+                            ? ''
+                            : log.ship_date || (log.products && log.products.ship_date) || '';
                           const prodRate = log.duration_hours > 0 && log.quantity > 0
                             ? Math.round((Number(log.quantity) / Number(log.duration_hours)) * 100) / 100
                             : 0;
@@ -668,6 +682,24 @@ export default function ReportAnalytics() {
                                 }`}>
                                   {isDaily ? 'Công nhật' : (log.customer || (log.products && log.products.customer) || 'Nội bộ')}
                                 </span>
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap">
+                                {orderCode ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200 font-mono">
+                                    {orderCode}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">—</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap">
+                                {shipDate ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                    {formatDateVN(shipDate)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">—</span>
+                                )}
                               </td>
                               <td className="px-6 py-3 text-xs font-medium text-violet-700">
                                 {log.operation ? (

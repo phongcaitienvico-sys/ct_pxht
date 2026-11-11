@@ -39,6 +39,8 @@ import {
   filterLogs,
   handleRealtimeEvent,
   formatLogTime,
+  formatShipDateVN,
+  enrichLogsWithProducts,
   getTodayDateString,
   validateLogInput,
   normalizeSearchText
@@ -155,10 +157,15 @@ export default function RealtimeFeed() {
     return dateStr;
   };
 
+  // Enrich logs with product catalog info (order_code / PO, ship_date, customer, name)
+  const enrichedLogs = useMemo(() => {
+    return enrichLogsWithProducts(logs, products);
+  }, [logs, products]);
+
   // Real-time KPI Calculation for active filter date (today, all, or custom)
   const currentKPI = useMemo(() => {
-    return calculateTodayKPI(logs, activeFilterDate);
-  }, [logs, activeFilterDate]);
+    return calculateTodayKPI(enrichedLogs, activeFilterDate);
+  }, [enrichedLogs, activeFilterDate]);
 
   // Handle Reset Demo Data
   const handleResetDemoData = async () => {
@@ -177,11 +184,11 @@ export default function RealtimeFeed() {
 
   // Filtered Logs
   const filteredLogs = useMemo(() => {
-    return filterLogs(logs, {
+    return filterLogs(enrichedLogs, {
       searchTerm: searchTerm,
       date: activeFilterDate
     });
-  }, [logs, searchTerm, activeFilterDate]);
+  }, [enrichedLogs, searchTerm, activeFilterDate]);
 
   // Open Edit Modal
   const handleOpenEdit = (log) => {
@@ -450,7 +457,7 @@ export default function RealtimeFeed() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm theo tên thợ, mã NV, tên sản phẩm, mã SP, ghi chú..."
+            placeholder="Tìm theo tên thợ, mã NV, tên sản phẩm, mã SP, mã đơn/PO, ngày đi, ghi chú..."
             className="w-full pl-9 pr-8 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all placeholder:text-slate-400"
           />
           {searchTerm && (
@@ -536,6 +543,8 @@ export default function RealtimeFeed() {
                   <th className="py-3 px-4 w-28">Thời Điểm</th>
                   <th className="py-3 px-4">Công Nhân</th>
                   <th className="py-3 px-4">Chi Tiết Sản Phẩm</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Mã Đơn / PO</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Ngày Đi</th>
                   <th className="py-3 px-4 text-center">Số Lượng</th>
                   <th className="py-3 px-4 text-center">Thời Gian</th>
                   <th className="py-3 px-4">Ghi Chú</th>
@@ -545,16 +554,25 @@ export default function RealtimeFeed() {
               <tbody className="divide-y divide-slate-100">
                 {filteredLogs.map((log) => {
                   const isNewItem = log._isNew || log.id === recentInsertedId;
+                  const isDaily = !log.product_id || Boolean(log.is_daily_work);
                   const empName =
                     log.employee_name || (log.employees && log.employees.full_name) || 'Chưa rõ';
                   const empCode =
                     log.employee_code || (log.employees && log.employees.code) || 'NV';
-                  const prodName =
-                    log.product_name || (log.products && log.products.name) || 'Sản phẩm ' + log.product_id;
+                  const prodName = isDaily
+                    ? log.operation || log.daily_work || 'Công nhật'
+                    : log.product_name || (log.products && log.products.name) || 'Sản phẩm ' + log.product_id;
                   const prodId =
                     log.product_id || (log.products && log.products.id) || '';
-                  const customer =
-                    log.customer || (log.products && log.products.customer) || '';
+                  const customer = isDaily
+                    ? ''
+                    : log.customer || (log.products && log.products.customer) || '';
+                  const orderCode = isDaily
+                    ? ''
+                    : log.order_code || (log.products && log.products.order_code) || '';
+                  const shipDate = isDaily
+                    ? ''
+                    : log.ship_date || (log.products && log.products.ship_date) || '';
 
                   return (
                     <tr
@@ -589,13 +607,19 @@ export default function RealtimeFeed() {
                         <div className="font-medium text-slate-800 truncate" title={prodName}>
                           {prodName}
                         </div>
-                        {log.operation && (
+                        {log.operation && !isDaily && (
                           <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">
                             {log.operation}
                           </span>
                         )}
                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                          <span className="font-mono text-slate-400">#{prodId}</span>
+                          {isDaily ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              Công nhật
+                            </span>
+                          ) : (
+                            <span className="font-mono text-slate-400">#{prodId}</span>
+                          )}
                           {customer && (
                             <>
                               <span>•</span>
@@ -605,6 +629,28 @@ export default function RealtimeFeed() {
                             </>
                           )}
                         </div>
+                      </td>
+
+                      {/* Mã Đơn / PO */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {orderCode ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200 font-mono">
+                            {orderCode}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Ngày Đi */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {shipDate ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                            {formatShipDateVN(shipDate)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
                       </td>
 
                       {/* Số lượng */}
@@ -658,6 +704,13 @@ export default function RealtimeFeed() {
           <div className="md:hidden divide-y divide-slate-100 p-2.5 space-y-2.5">
             {filteredLogs.map((log) => {
               const isHighlighted = recentInsertedId === log.id;
+              const isDaily = !log.product_id || Boolean(log.is_daily_work);
+              const orderCode = isDaily
+                ? ''
+                : log.order_code || (log.products && log.products.order_code) || '';
+              const shipDate = isDaily
+                ? ''
+                : log.ship_date || (log.products && log.products.ship_date) || '';
               return (
                 <div
                   key={log.id}
@@ -694,15 +747,29 @@ export default function RealtimeFeed() {
                     <div className="flex items-start text-xs text-slate-700">
                       <Package className="w-3.5 h-3.5 text-slate-400 mr-1.5 mt-0.5 flex-shrink-0" />
                       <div className="leading-tight">
-                        <span className="font-medium text-slate-800">{log.product_name || `Mã #${log.product_id}`}</span>
-                        {log.operation && (
+                        <span className="font-medium text-slate-800">
+                          {isDaily
+                            ? log.operation || log.daily_work || 'Công nhật'
+                            : log.product_name || `Mã #${log.product_id}`}
+                        </span>
+                        {log.operation && !isDaily && (
                           <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 font-semibold">
                             {log.operation}
                           </span>
                         )}
-                        {log.customer && (
+                        {log.customer && !isDaily && (
                           <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-normal">
                             {log.customer}
+                          </span>
+                        )}
+                        {orderCode && (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 font-mono font-semibold">
+                            PO: {orderCode}
+                          </span>
+                        )}
+                        {shipDate && (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-semibold">
+                            Đi: {formatShipDateVN(shipDate)}
                           </span>
                         )}
                       </div>

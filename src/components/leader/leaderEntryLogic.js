@@ -287,7 +287,11 @@ export function formatProductLabel(product) {
   const id = product.id ?? '';
   const name = product.name ?? '';
   const customer = product.customer ? ` (${product.customer})` : '';
-  return `[#${id}] ${name}${customer}`.trim();
+  const orderCode = product.order_code ? ` • PO: ${String(product.order_code).trim()}` : '';
+  const rawShip = product.ship_date ? String(product.ship_date).trim() : '';
+  const shipMatch = rawShip ? /^(\d{4})-(\d{2})-(\d{2})/.exec(rawShip) : null;
+  const shipText = rawShip ? ` • Đi: ${shipMatch ? `${shipMatch[3]}/${shipMatch[2]}/${shipMatch[1]}` : rawShip}` : '';
+  return `[#${id}] ${name}${customer}${orderCode}${shipText}`.trim();
 }
 
 /**

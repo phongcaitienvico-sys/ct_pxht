@@ -1,10 +1,14 @@
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   calculateTodayKPI,
   filterLogs,
   handleRealtimeEvent,
   formatLogTime,
-  normalizeSearchText
+  normalizeSearchText,
+  enrichLogsWithProducts,
+  formatShipDateVN
 } from '../src/components/admin/realtimeFeedLogic.js';
 
 console.log('Running tests/realtimeFeed.test.js...\n');
@@ -349,6 +353,50 @@ console.log('4. Testing formatLogTime and normalizeSearchText...');
 }
 
 console.log('✓ formatLogTime and normalizeSearchText passed all assertions.\n');
+
+// ============================================================================
+// 5. Tests for PO (order_code) & Ship Date (ship_date) in Realtime Feed
+// ============================================================================
+console.log('5. Testing enrichLogsWithProducts, formatShipDateVN & PO search...');
+{
+  assert.strictEqual(formatShipDateVN('2026-11-11'), '11/11/2026');
+  assert.strictEqual(formatShipDateVN(null), '');
+  assert.strictEqual(formatShipDateVN(''), '');
+
+  const productsCatalog = [
+    { id: '1', name: 'ALKTOP 1130H', customer: 'Win win', order_code: 'PO 487', ship_date: '2026-11-11' }
+  ];
+  const rawRealtimeLogs = [
+    { id: 'rt-1', product_id: '1', employee_name: 'Phạm Minh Châu', quantity: 23, duration_hours: 3 },
+    { id: 'rt-2', product_id: null, is_daily_work: true, operation: 'Dọn xưởng', quantity: 0, duration_hours: 2 }
+  ];
+
+  const enriched = enrichLogsWithProducts(rawRealtimeLogs, productsCatalog);
+  assert.strictEqual(enriched[0].product_name, 'ALKTOP 1130H');
+  assert.strictEqual(enriched[0].customer, 'Win win');
+  assert.strictEqual(enriched[0].order_code, 'PO 487');
+  assert.strictEqual(enriched[0].ship_date, '2026-11-11');
+  assert.strictEqual(enriched[1].order_code, '');
+  assert.strictEqual(enriched[1].ship_date, null);
+
+  assert.strictEqual(filterLogs(enriched, { searchTerm: 'PO 487' }).length, 1);
+  assert.strictEqual(filterLogs(enriched, { searchTerm: '11/11/2026' }).length, 1);
+}
+console.log('✓ PO & ship_date realtime enrichment and search passed.\n');
+
+{
+  const rfSrc = fs.readFileSync(path.resolve('src/components/admin/RealtimeFeed.jsx'), 'utf8');
+  assert.ok(rfSrc.includes('enrichLogsWithProducts'), 'RealtimeFeed.jsx must enrich logs with products catalog');
+  assert.ok(rfSrc.includes('Mã Đơn / PO') || rfSrc.includes('order_code'), 'RealtimeFeed.jsx must display PO / order_code');
+  assert.ok(rfSrc.includes('Ngày Đi') && rfSrc.includes('formatShipDateVN'), 'RealtimeFeed.jsx must display Ngày Đi via formatShipDateVN');
+
+  const raSrc = fs.readFileSync(path.resolve('src/components/admin/ReportAnalytics.jsx'), 'utf8');
+  assert.ok(raSrc.includes('order_code') && raSrc.includes('ship_date'), 'ReportAnalytics.jsx must display order_code and ship_date');
+
+  const ldSrc = fs.readFileSync(path.resolve('src/components/leader/LeaderDailyLogs.jsx'), 'utf8');
+  assert.ok(ldSrc.includes('order_code') && ldSrc.includes('ship_date'), 'LeaderDailyLogs.jsx must display order_code and ship_date');
+}
+console.log('✓ UI source verification for PO & Ngày đi passed.\n');
 
 console.log('----------------------------------------------------');
 console.log('All tests in tests/realtimeFeed.test.js PASSED!');

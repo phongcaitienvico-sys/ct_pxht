@@ -647,7 +647,9 @@ function normalizeSupabaseLogRow(row) {
     product_name: row.product_id
       ? row.product_name || row.products?.name || ''
       : cleanOp || (row.notes ? `[Ghi chú] ${row.notes}` : 'Công nhật'),
-    customer: row.product_id ? row.customer || row.products?.customer || '' : 'Công nhật'
+    customer: row.product_id ? row.customer || row.products?.customer || '' : 'Công nhật',
+    order_code: row.product_id ? row.order_code || row.products?.order_code || '' : '',
+    ship_date: row.product_id ? row.ship_date || row.products?.ship_date || null : null
   };
 }
 
@@ -695,6 +697,8 @@ export async function submitProductionLogs(logsArray) {
         employee_code: emp ? emp.code : '',
         product_name: prod ? prod.name : cleanOp || (item.notes ? `[Ghi chú] ${item.notes}` : 'Công nhật'),
         customer: prod ? prod.customer : 'Công nhật',
+        order_code: prod ? prod.order_code || '' : '',
+        ship_date: prod ? prod.ship_date || null : null,
         team_name: team ? team.name : '',
         employees: emp || null,
         products: prod || null,
@@ -790,6 +794,8 @@ export async function getProductionLogs(filter = {}) {
           ? prod.name
           : (l.product_name || cleanOp || (l.notes ? `[Ghi chú] ${l.notes}` : 'Công nhật')),
         customer: prod ? prod.customer : (isDaily ? 'Công nhật' : (l.customer || '')),
+        order_code: prod ? (prod.order_code || '') : (isDaily ? '' : (l.order_code || '')),
+        ship_date: prod ? (prod.ship_date || null) : (isDaily ? null : (l.ship_date || null)),
         team_name: team ? team.name : (l.team_name || ''),
         employees: emp || l.employees || null,
         products: prod || l.products || null,
@@ -878,6 +884,8 @@ export async function updateProductionLog(logId, updates) {
     updated.employee_code = emp ? emp.code : '';
     updated.product_name = prod ? prod.name : (updated.operation || 'Công nhật');
     updated.customer = prod ? prod.customer : 'Công nhật';
+    updated.order_code = prod ? (prod.order_code || '') : '';
+    updated.ship_date = prod ? (prod.ship_date || null) : null;
     updated.team_name = team ? team.name : '';
     updated.employees = emp || null;
     updated.products = prod || null;
@@ -971,10 +979,25 @@ export function subscribeToLogs(callback) {
 
   const channel = supabase
     .channel('production_logs_realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'production_logs' }, (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'production_logs' }, async (payload) => {
+      let enrichedNew = payload.new ? normalizeSupabaseLogRow(payload.new) : payload.new;
+      if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new?.id) {
+        try {
+          const { data: fullRow } = await supabase
+            .from('production_logs')
+            .select('*, employees(*), products(*), teams(*)')
+            .eq('id', payload.new.id)
+            .maybeSingle();
+          if (fullRow) {
+            enrichedNew = normalizeSupabaseLogRow(fullRow);
+          }
+        } catch (err) {
+          console.warn('Realtime log enrichment fallback:', err);
+        }
+      }
       callback({
         ...payload,
-        new: payload.new ? normalizeSupabaseLogRow(payload.new) : payload.new,
+        new: enrichedNew,
         old: payload.old ? normalizeSupabaseLogRow(payload.old) : payload.old
       });
     })

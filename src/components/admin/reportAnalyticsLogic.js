@@ -163,8 +163,11 @@ export function filterLogsByCriteria(logs, filters = {}) {
       const notes = log.notes || '';
       const teamName = log.team_name || (log.teams && log.teams.name) || '';
       const operation = log.operation || '';
+      const orderCode = log.order_code || (log.products && log.products.order_code) || '';
+      const rawShip = log.ship_date || (log.products && log.products.ship_date) || '';
+      const shipFormatted = rawShip ? formatDateVN(String(rawShip)) : '';
 
-      const fullHaystack = `${prodName} ${prodId} ${customer} ${empName} ${empCode} ${notes} ${teamName} ${operation}`.toLowerCase();
+      const fullHaystack = `${prodName} ${prodId} ${customer} ${empName} ${empCode} ${notes} ${teamName} ${operation} ${orderCode} ${rawShip} ${shipFormatted}`.toLowerCase();
       if (!fullHaystack.includes(searchKeyword)) {
         return false;
       }
